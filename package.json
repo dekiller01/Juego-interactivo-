@@ -1,0 +1,14 @@
+{
+  "name": "neon-beat-rush",
+  "version": "1.0.0",
+  "description": "Neon Beat Rush: shooter 3D al ritmo de la música con eventos de TikTok LIVE",
+  "type": "module",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "express": "^4.21.2",
+    "tiktok-live-connector": "^2.5.0",
+    "ws": "^8.18.2"
+  }
+}
