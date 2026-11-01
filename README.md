@@ -46,9 +46,28 @@ curl -X POST https://TU-APP.onrender.com/api/event -H 'content-type: application
 Tipos: `chat` (`text`), `gift` (`gift`, `count`, `diamonds`), `like` (`count`), `follow`.
 Estado del servidor: `/api/status`.
 
-## Comandos de chat
+## Reacciones del directo
 
-`!ump` `!pistola` `!escopeta` `!sniper` `!granada` `!curar` `!lento` `!caos` `!creeper` `!boss` `!dragon`
+**Comandos de chat** (cada espectador tiene su propio enfriamiento):
+
+| Comando | Qué hace |
+|---|---|
+| `!ump` `!pistola` `!escopeta` `!sniper` | cambia el arma |
+| `!granada` `!curar` `!lento` `!caos` | granada, curación, tiempo lento, horda |
+| `!creeper` | tres explosivos |
+| `!boss` `!dragon` `!fenix` | invoca jefe, dragón o fénix (dispara hielo) |
+| `!toro` | un toro que embiste en línea recta |
+| `!fantasma` | un fantasma que se teletransporta al ritmo |
+| `!ayuda` | un dron aliado con su nombre, 12 s |
+| `!congelar` | congela a todos 3 s |
+| `!disco` | 10 s de luces y puntos x2 |
+
+**Regalos**: por nombre (rosa, helado/GG, corazón, galaxia, león) activan un efecto propio (pétalos y vida, congelar,
+escudo de amor, meteoritos, 4 drones). Los demás dependen de su valor: pequeños curan, medianos lanzan granadas,
+grandes dan minigun y la nuke limpia el salón. Casi todos suman drones aliados con el nombre de quien envió el regalo.
+
+**Likes**: barra de 100 likes; al llenarla hay fuegos artificiales, mejora y vida. **Seguir**: bonus y fuegos.
+**Compartir**: carga de ultimate. Abajo en pantalla se ve el TOP 3 de fans de la sesión.
 
 ## Aviso
 
