@@ -61,6 +61,7 @@ Estado del servidor: `/api/status`.
 | `!ayuda` | un dron aliado con su nombre, 12 s |
 | `!congelar` | congela a todos 3 s |
 | `!disco` | 10 s de luces y puntos x2 |
+| `!siguiente` | pasa a la siguiente canción de tu lista |
 
 **Regalos**: por nombre (rosa, helado/GG, corazón, galaxia, león) activan un efecto propio (pétalos y vida, congelar,
 escudo de amor, meteoritos, 4 drones). Los demás dependen de su valor: pequeños curan, medianos lanzan granadas,
@@ -68,6 +69,14 @@ grandes dan minigun y la nuke limpia el salón. Casi todos suman drones aliados 
 
 **Likes**: barra de 100 likes; al llenarla hay fuegos artificiales, mejora y vida. **Seguir**: bonus y fuegos.
 **Compartir**: carga de ultimate. Abajo en pantalla se ve el TOP 3 de fans de la sesión.
+
+## Música
+
+En la pantalla de inicio, **🎵 MI MÚSICA**: añade varias canciones a la vez desde el teléfono. Se guardan en el navegador
+(no hace falta volver a elegirlas), suenan una detrás de otra, y puedes activar el modo aleatorio. Durante la partida
+el botón ⏭ (arriba a la derecha) y el menú de pausa cambian de canción. Si solo hay una, se repite en bucle.
+
+Usa música libre de derechos: la música comercial puede hacer que TikTok silencie o sancione el directo.
 
 ## Aviso
 

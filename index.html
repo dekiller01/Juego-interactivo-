@@ -109,7 +109,26 @@ body:not(.play) #fans,body:not(.play) #likes{display:none}
 .wb.sel{background:color-mix(in srgb,var(--wc,#fff) 35%,#000);box-shadow:0 0 16px var(--wc,#fff)}
 .wb.rl{opacity:.5}
 #gear{position:fixed;right:max(10px,env(safe-area-inset-right,0px));top:max(52px,calc(env(safe-area-inset-top,0px) + 52px));z-index:4;width:38px;height:38px;border-radius:50%;border:1px solid #fff4;background:rgba(0,0,0,.5);color:#fff;font-size:18px;display:none}
-body.play #gear,body.play #spBtn{display:block}
+body.play #gear,body.play #spBtn,body.play #nxBtn{display:block}
+#nxBtn{position:fixed;right:max(102px,calc(env(safe-area-inset-right,0px) + 102px));top:max(52px,calc(env(safe-area-inset-top,0px) + 52px));z-index:4;width:38px;height:38px;border-radius:50%;border:1px solid var(--c3);background:rgba(0,0,0,.55);color:#fff;font-size:15px;display:none;padding:0}
+#np{position:fixed;left:50%;transform:translateX(-50%);bottom:max(66px,calc(env(safe-area-inset-bottom,0px) + 66px));max-width:56vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--body);font-weight:700;font-size:11px;color:var(--c1);text-shadow:0 0 6px #000;pointer-events:none;opacity:.55;z-index:1}
+#np.on{animation:npin 5s ease-out}
+@keyframes npin{0%{opacity:0;transform:translateX(-50%) translateY(8px)}8%{opacity:1;transform:translateX(-50%)}80%{opacity:1}100%{opacity:.55;transform:translateX(-50%)}}
+body:not(.play) #np{display:none}
+#mus{z-index:11;background:radial-gradient(ellipse at 50% 15%,#3a1466,#07040f 75%);align-items:start}
+#mus .card{text-align:left;max-width:560px;margin:0 auto}
+#mus h2{font-family:var(--disp);font-size:14px;letter-spacing:.2em;margin:14px 0 6px;color:var(--c1)}
+#mus .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+#musList{max-height:34vh;overflow-y:auto;border:1px solid #fff2;border-radius:4px;background:#0004;touch-action:pan-y}
+#musList .tr{display:flex;align-items:stretch;border-bottom:1px solid #fff1}
+#musList .tr button{background:transparent;border:0;color:#fff;font-family:var(--body);font-weight:700;font-size:14px;padding:10px;text-align:left;cursor:pointer}
+#musList .tr .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#musList .tr.on .nm{color:var(--c3)}
+#musList .tr .x{color:var(--bad);padding:10px 14px}
+#musList .empty{padding:12px;color:var(--mut);font-size:13px}
+#mus .links{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+#mus .links a{color:var(--c1);font-family:var(--body);font-weight:700;font-size:14px}
+#mus .links small{color:var(--mut);font-weight:500;font-size:12px}
 #spBtn{position:fixed;right:max(56px,calc(env(safe-area-inset-right,0px) + 56px));top:max(52px,calc(env(safe-area-inset-top,0px) + 52px));z-index:4;width:38px;height:38px;border-radius:50%;border:1px solid var(--c2);background:rgba(0,0,0,.55);color:#fff;font-size:17px;display:none;padding:0}
 #spp{position:fixed;right:max(104px,calc(env(safe-area-inset-right,0px) + 104px));top:max(52px,calc(env(safe-area-inset-top,0px) + 52px));display:none;flex-direction:column;gap:5px;z-index:4}
 #spp.on{display:grid;grid-template-columns:auto auto}
@@ -165,7 +184,8 @@ input[type=range]{flex:1;accent-color:var(--c2);touch-action:pan-x;height:28px}
   #spBtn{top:max(10px,env(safe-area-inset-top,0px))}
   #spp{top:max(54px,calc(env(safe-area-inset-top,0px) + 54px))}
   #hud{padding-top:max(6px,env(safe-area-inset-top,0px))}
-  .top{grid-template-columns:1fr auto 1fr;padding-right:96px}
+  .top{grid-template-columns:1fr auto 1fr;padding-right:142px}
+  #nxBtn{top:max(10px,env(safe-area-inset-top,0px))}
   .score b{font-size:24px} #feed{top:30%;max-width:34%}
   #banner{top:24%;font-size:clamp(22px,5vw,38px)}
   #eq{height:28px}
@@ -202,6 +222,8 @@ input[type=range]{flex:1;accent-color:var(--c2);touch-action:pan-x;height:28px}
 <div id="abar"><button class="ab" id="ab1"><span>HAB</span></button><button class="ab" id="ab2"><span>ULT</span></button></div>
 <button id="gear" aria-label="Ajustes">⚙</button>
 <button id="spBtn" aria-label="Invocar enemigos">☠</button>
+<button id="nxBtn" aria-label="Siguiente canción">⏭</button>
+<div id="np"></div>
 <div id="spp"></div>
 <div id="likes"><i id="likeFill"></i></div><div id="fans"></div>
 
@@ -224,8 +246,7 @@ input[type=range]{flex:1;accent-color:var(--c2);touch-action:pan-x;height:28px}
       <button data-bpm="154">FRENÉTICO</button>
     </div>
     <label class="slider" for="bpm">BPM <input type="range" id="bpm" min="70" max="180" value="124"><b id="bpmv">124</b></label>
-    <button class="ghost" id="loadMusic">🎵 USAR MI MÚSICA</button>
-    <input type="file" id="file" accept="audio/*" hidden>
+    <button class="ghost" id="loadMusic">🎵 MI MÚSICA</button>
     <div class="mut" id="musicInfo">Música: sintetizador integrado</div>
     <button class="go" id="go">JUGAR</button>
     </div>
@@ -241,12 +262,30 @@ input[type=range]{flex:1;accent-color:var(--c2);touch-action:pan-x;height:28px}
   </div>
 </div>
 
+<div class="ov hide" id="mus">
+  <div class="card">
+    <h1 style="font-size:clamp(26px,7vw,38px)">MI MÚSICA</h1>
+    <div class="row"><button class="sm" id="musAdd">+ AÑADIR CANCIONES</button><button class="sm" id="musShuf">ALEATORIO: NO</button><button class="sm" id="musSyn">USAR SINTETIZADOR</button></div>
+    <input type="file" id="musFile" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.opus,.flac" multiple hidden>
+    <div id="musList"></div>
+    <div class="st" id="musSt">Elige varias canciones a la vez. Se guardan en tu teléfono para la próxima vez y suenan una detrás de otra.</div>
+    <h2>CONSEGUIR MÚSICA GRATIS</h2>
+    <div class="links">
+      <a href="https://pixabay.com/music/" target="_blank" rel="noopener">Pixabay Música ↗ <small>gratis, sin pedir crédito (revisa su licencia)</small></a>
+      <a href="https://freemusicarchive.org/" target="_blank" rel="noopener">Free Music Archive ↗ <small>mira la licencia de cada tema; evita las «NC» si ganas con regalos</small></a>
+      <a href="https://incompetech.com/music/royalty-free/" target="_blank" rel="noopener">Incompetech ↗ <small>pide poner el crédito del autor</small></a>
+    </div>
+    <div class="st">Descarga las canciones en el teléfono y vuelve aquí a pulsar «+ AÑADIR CANCIONES». La música comercial puede hacer que TikTok silencie o sancione tu directo, así que usa música libre.</div>
+    <div class="row"><button class="sm" id="musClear">BORRAR TODAS</button><button class="sm" id="musClose">LISTO</button></div>
+  </div>
+</div>
 <div id="rot"><div><b>⟳</b><p>GIRA EL TELÉFONO</p><small>Neon Beat Rush se juega en horizontal.<br>Activa la rotación automática si no gira.</small></div></div>
 <div id="drawer">
   <div class="card" style="text-align:left;margin:0 auto">
     <div class="row"><button class="sm" id="resume">▶ SEGUIR</button><button class="sm" id="quit">⏏ MENÚ</button></div>
     <h2>VOLUMEN</h2>
     <label class="slider" for="mv">MÚSICA <input type="range" id="mv" min="0" max="1" step="0.05"></label>
+    <div class="row"><button class="sm" id="trPrev">⏮ ANTERIOR</button><button class="sm" id="trNext">⏭ SIGUIENTE</button></div><div class="st" id="npD"></div>
     <label class="slider" for="sv">EFECTOS <input type="range" id="sv" min="0" max="1" step="0.05"></label>
     <h2>CONTROL</h2>
     <div class="row"><button class="sm" id="lookBtn">MIRAR: BORDES</button><button class="sm" id="offBtn">CRUZ ARRIBA DEL DEDO</button><button class="sm" id="hqBtn">CALIDAD ALTA</button></div>
@@ -437,11 +476,27 @@ A.riser=function(t,dur){const c=this.ctx,s=c.createBufferSource();s.buffer=this.
 A.impact=function(){if(!this.ctx)return;this.boom(true);this.blip(90,28,.9,.8,'sine');};
 A.startSynth=function(){this.mode='synth';if(this.el)this.el.pause();this.beatQ=[];this.step=0;this.nextT=this.ctx.currentTime+0.1;clearInterval(this.timer);this.timer=setInterval(()=>this.sched(),25);};
 A.stopAll=function(){clearInterval(this.timer);if(this.el)this.el.pause();};
-A.useFile=function(file){
-  this.init(); if(!this.ctx) return false; const url=URL.createObjectURL(file);
-  if(!this.el){this.el=new Audio();this.el.loop=true;this.src=this.ctx.createMediaElementSource(this.el);this.src.connect(this.music);}
-  this.el.src=url; this.mode='file'; this.fileName=file.name; return true;
+A.list=[]; A.idx=0; A.shuffle=false; A.useList=false; A.url=null; A.badN=0;
+A.setTrack=function(i,play){
+  if(!this.list.length)return false; this.init(); if(!this.ctx)return false;
+  const n=this.list.length; i=((i%n)+n)%n; this.idx=i; const t=this.list[i]; const old=this.url; this.url=URL.createObjectURL(t.blob);
+  if(!this.el){
+    this.el=new Audio(); this.src=this.ctx.createMediaElementSource(this.el); this.src.connect(this.music);
+    this.el.addEventListener('ended',()=>A.next(true));
+    this.el.addEventListener('playing',()=>{A.badN=0;});
+    this.el.addEventListener('error',()=>{if(A.list.length>1&&A.badN++<A.list.length)A.next(true);});
+  }
+  this.el.loop=(n===1); this.el.src=this.url; if(old){try{URL.revokeObjectURL(old);}catch(e){}}
+  this.mode='file'; this.fileName=t.name; this.hist.length=0; store.set('nbr.idx',i);
+  if(play){if(this.ctx.state==='suspended')this.ctx.resume();const p=this.el.play();if(p&&p.catch)p.catch(()=>{});}
+  musicChanged(); return true;
 };
+A.next=function(auto){
+  const n=this.list.length; if(!n)return; let i=this.idx+1;
+  if(this.shuffle&&n>1){do{i=(Math.random()*n)|0;}while(i===this.idx);}
+  this.setTrack(i,!!(S.running&&!S.paused));
+};
+A.prev=function(){if(!this.list.length)return;this.setTrack(this.idx-1,!!(S.running&&!S.paused));};
 A.startFile=function(){clearInterval(this.timer);this.beatQ=[];if(this.el){this.el.currentTime=0;const p=this.el.play();if(p&&p.catch)p.catch(()=>{});}};
 A.update=function(){
   if(!this.ctx||!this.an) return; const now=nowS();
@@ -1073,6 +1128,7 @@ const Live={
     if(c==='!creeper'||c==='!explosivo'){if(!cool('x',10))return;feed(user,'soltó explosivos');for(let i=0;i<3;i++)spawnEnemy('bomber');return;}
     if(c==='!lento'){if(!cool('s',30))return;feed(user,'ralentizó el tiempo');S.slowT=S.t+4;banner('TIEMPO LENTO','#19f0ff','@'+user);return;}
     if(c==='!caos'){if(!cool('c',15))return;feed(user,'desató el caos');spawnGroup(5);return;}
+    if(c==='!siguiente'||c==='!next'){if(!(A.useList&&A.mode==='file'&&A.list.length>1)||!cool('nx',45))return;feed(user,'cambió la canción');A.next();return;}
     if(c==='!toro'){if(countOf('charger')>=8||!coolU('t',user,25,3))return;feed(user,'soltó un TORO');spawnEnemy('charger');return;}
     if(c==='!fantasma'){if(countOf('phantom')>=8||!coolU('f',user,25,3))return;feed(user,'soltó un FANTASMA');spawnEnemy('phantom');return;}
     if(c==='!fenix'||c==='!fénix'){if(countOf('phoenix')>=5||!coolU('p',user,40,5))return;feed(user,'invocó un FÉNIX');if(spawnEnemy('phoenix'))banner('¡FÉNIX!','#2fd3ff','@'+user);return;}
@@ -1139,7 +1195,7 @@ function resetGame(){
 }
 function startGame(){
   $('start').classList.add('hide'); $('over').classList.add('hide'); document.body.classList.add('play'); S.char=CFG.ch; resetGame();
-  A.init(); if(A.ctx){A.ctx.resume();A.music.gain.value=CFG.mv*.7;A.sfx.gain.value=CFG.sv;if(A.mode==='file')A.startFile();else{A.bpm=+$('bpm').value;A.startSynth();}}
+  A.init(); if(A.ctx){A.ctx.resume();A.music.gain.value=CFG.mv*.7;A.sfx.gain.value=CFG.sv;if(A.useList&&A.list.length){A.setTrack(A.shuffle&&A.list.length>1?(Math.random()*A.list.length)|0:A.idx,false);A.startFile();}else{A.bpm=+$('bpm').value;A.startSynth();}}
   try{const el=document.documentElement;const fs=el.requestFullscreen&&el.requestFullscreen();if(fs&&fs.then)fs.then(()=>screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape')).catch(()=>{});}catch(e){}
   S.running=true; S.paused=false; banner('¡AL RITMO!','#19f0ff',CHARS[S.char].name);
 }
@@ -1160,9 +1216,70 @@ $('go').addEventListener('click',startGame); $('again').addEventListener('click'
 $('gear').addEventListener('click',()=>setPause(true)); $('resume').addEventListener('click',()=>setPause(false));
 $('quit').addEventListener('click',()=>{$('spp').classList.remove('on');S.paused=false;S.running=false;$('drawer').classList.remove('on');A.stopAll();if(A.ctx)A.ctx.resume();document.body.classList.remove('play');$('start').classList.remove('hide');});
 $('bpm').addEventListener('input',e=>{$('bpmv').textContent=e.target.value;A.bpm=+e.target.value;document.querySelectorAll('#tempo button').forEach(b=>b.classList.remove('on'));});
-document.querySelectorAll('#tempo button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#tempo button').forEach(x=>x.classList.remove('on'));b.classList.add('on');$('bpm').value=b.dataset.bpm;$('bpmv').textContent=b.dataset.bpm;A.bpm=+b.dataset.bpm;A.mode='synth';$('musicInfo').textContent='Música: sintetizador integrado';}));
-$('loadMusic').addEventListener('click',()=>$('file').click());
-$('file').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;if(A.useFile(f))$('musicInfo').textContent='Música: '+f.name.slice(0,40);else $('musicInfo').textContent='Este navegador no permite audio.';});
+document.querySelectorAll('#tempo button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#tempo button').forEach(x=>x.classList.remove('on'));b.classList.add('on');$('bpm').value=b.dataset.bpm;$('bpmv').textContent=b.dataset.bpm;A.bpm=+b.dataset.bpm;}));
+/* ---- Mi música: varias canciones guardadas en el teléfono ---- */
+const MusicDB={
+  open(){return new Promise((res,rej)=>{try{const r=indexedDB.open('nbr-music',1);r.onupgradeneeded=()=>{r.result.createObjectStore('t',{keyPath:'id',autoIncrement:true});};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}catch(e){rej(e);}});},
+  async run(mode,fn){const db=await this.open();return new Promise((res,rej)=>{const tx=db.transaction('t',mode),q=fn(tx.objectStore('t'));tx.oncomplete=()=>{db.close();res(q&&q.result);};tx.onerror=tx.onabort=()=>{db.close();rej(tx.error);};});},
+  all(){return this.run('readonly',os=>os.getAll());},
+  add(name,blob){return this.run('readwrite',os=>os.add({name,blob}));},
+  del(id){return this.run('readwrite',os=>os.delete(id));},
+  clear(){return this.run('readwrite',os=>os.clear());}
+};
+A.shuffle=!!store.get('nbr.shuf',false); A.useList=!!store.get('nbr.ul',true);
+const AUDIO_RE=/\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|weba|webm)$/i;
+const trackName=n=>String(n||'').replace(/\.[a-z0-9]{2,5}$/i,'');
+function musicChanged(){
+  const n=A.list.length, on=A.useList&&n>0, playing=on&&A.mode==='file', nm=trackName(A.fileName).slice(0,48);
+  $('musicInfo').textContent=on?('Música: '+n+(n>1?' canciones':' canción')+(A.shuffle&&n>1?' · aleatorio':'')+(playing?' · ♪ '+nm:'')):'Música: sintetizador integrado';
+  const np=$('np'); np.textContent=playing?'♪ '+nm+(n>1?'  ('+(A.idx+1)+'/'+n+')':''):''; np.classList.remove('on'); void np.offsetWidth; np.classList.add('on');
+  $('npD').textContent=playing?'♪ '+nm+' ('+(A.idx+1)+'/'+n+')':'Música: sintetizador integrado';
+  renderMusList();
+}
+function renderMusList(){
+  const box=$('musList'); box.textContent='';
+  if(!A.list.length){const d=document.createElement('div');d.className='empty';d.textContent='Todavía no hay canciones. Pulsa «+ AÑADIR CANCIONES» y elige varias de tu teléfono.';box.appendChild(d);return;}
+  A.list.forEach((t,i)=>{
+    const cur=i===A.idx&&A.mode==='file'&&A.useList, r=document.createElement('div'); r.className='tr'+(cur?' on':'');
+    const b=document.createElement('button'); b.className='nm'; b.textContent=(cur?'♪ ':'')+trackName(t.name); b.addEventListener('click',()=>{A.useList=true;store.set('nbr.ul',true);syncMus();A.setTrack(i,true);});
+    const x=document.createElement('button'); x.className='x'; x.textContent='✕'; x.setAttribute('aria-label','Quitar'); x.addEventListener('click',()=>removeTrack(i));
+    r.appendChild(b); r.appendChild(x); box.appendChild(r);
+  });
+}
+function syncMus(){$('musShuf').textContent='ALEATORIO: '+(A.shuffle?'SÍ':'NO');$('musShuf').classList.toggle('on',A.shuffle);$('musSyn').textContent=A.useList?'USAR SINTETIZADOR':'USAR MIS CANCIONES';}
+async function removeTrack(i){
+  const t=A.list[i]; if(!t)return; try{if(t.id!=null)await MusicDB.del(t.id);}catch(e){}
+  const wasCur=(i===A.idx&&A.mode==='file'), playing=!!(A.el&&!A.el.paused); A.list.splice(i,1); if(i<A.idx)A.idx--;
+  if(!A.list.length){A.mode='synth';A.idx=0;try{A.el&&A.el.pause();}catch(e){}}
+  else if(wasCur){A.setTrack(Math.min(A.idx,A.list.length-1),playing);return;}
+  musicChanged();
+}
+$('loadMusic').addEventListener('click',()=>{$('mus').classList.remove('hide');syncMus();renderMusList();});
+$('musClose').addEventListener('click',()=>{$('mus').classList.add('hide');if(!S.running){try{A.el&&A.el.pause();}catch(e){}}});
+$('musAdd').addEventListener('click',()=>$('musFile').click());
+$('musFile').addEventListener('change',async e=>{
+  const files=[...(e.target.files||[])].filter(f=>(f.type||'').startsWith('audio/')||AUDIO_RE.test(f.name)); e.target.value='';
+  if(!files.length){$('musSt').textContent='No se encontró ningún archivo de audio.';return;}
+  let added=0,saved=0,dup=0;
+  for(const f of files){
+    if(A.list.some(t=>t.name===f.name&&t.blob.size===f.size)){dup++;continue;}
+    let id=null; try{id=await MusicDB.add(f.name,f);saved++;}catch(err){}
+    A.list.push({id,name:f.name,blob:f}); added++;
+  }
+  A.useList=true; store.set('nbr.ul',true); syncMus();
+  if(added&&A.list.length===added)A.setTrack(0,false); else musicChanged();
+  $('musSt').textContent=added+(added===1?' canción añadida':' canciones añadidas')+(added&&saved<added?' (solo esta sesión: el navegador no dejó guardarlas)':(added?' y guardadas en tu teléfono':''))+(dup?' · '+dup+' repetidas omitidas':'');
+});
+$('musShuf').addEventListener('click',()=>{A.shuffle=!A.shuffle;store.set('nbr.shuf',A.shuffle);syncMus();musicChanged();});
+$('musSyn').addEventListener('click',()=>{A.useList=!A.useList;store.set('nbr.ul',A.useList);if(!A.useList){try{A.el&&A.el.pause();}catch(e){}A.mode='synth';}else if(A.list.length)A.setTrack(A.idx,false);syncMus();musicChanged();});
+{let armed=0;$('musClear').addEventListener('click',async()=>{
+  if(!A.list.length)return; if(!armed){armed=setTimeout(()=>{armed=0;$('musClear').textContent='BORRAR TODAS';},3000);$('musClear').textContent='¿SEGURO? TOCA OTRA VEZ';return;}
+  clearTimeout(armed);armed=0;$('musClear').textContent='BORRAR TODAS'; try{await MusicDB.clear();}catch(e){} A.list=[];A.idx=0;A.mode='synth';try{A.el&&A.el.pause();}catch(e){} musicChanged(); $('musSt').textContent='Lista vacía.';
+});}
+const nextTrack=()=>{if(A.useList&&A.mode==='file'&&A.list.length>1)A.next();};
+$('trNext').addEventListener('click',nextTrack); $('trPrev').addEventListener('click',()=>{if(A.useList&&A.mode==='file'&&A.list.length>1)A.prev();});
+$('nxBtn').addEventListener('pointerdown',e=>e.stopPropagation()); $('nxBtn').addEventListener('click',nextTrack);
+syncMus(); MusicDB.all().then(rows=>{A.list=(rows||[]).map(r=>({id:r.id,name:r.name,blob:r.blob}));A.idx=clamp(+store.get('nbr.idx',0)||0,0,Math.max(0,A.list.length-1));musicChanged();}).catch(()=>{musicChanged();});
 $('mv').value=CFG.mv;$('sv').value=CFG.sv;
 $('mv').addEventListener('input',e=>{CFG.mv=+e.target.value;store.set('nbr.mv',CFG.mv);if(A.music)A.music.gain.value=CFG.mv*.7;});
 $('sv').addEventListener('input',e=>{CFG.sv=+e.target.value;store.set('nbr.sv',CFG.sv);if(A.sfx)A.sfx.gain.value=CFG.sv;});
@@ -1175,7 +1292,7 @@ $('wsUrl').value=CFG.ws; $('wsBtn').addEventListener('click',wsConnect); syncTog
  ['!ump',()=>Live.chat('prueba','!ump')],['!escopeta',()=>Live.chat('prueba','!escopeta')],['!sniper',()=>Live.chat('prueba','!sniper')],['!granada',()=>Live.chat('prueba','!granada')],['!boss',()=>spawnMany('boss',SP.mult)],['!dragon',()=>spawnMany('dragon',SP.mult)],['!creeper',()=>Live.chat('prueba','!creeper')],['!lento',()=>Live.chat('prueba','!lento')],['!caos',()=>Live.chat('prueba','!caos')],['❤ Like ×50',()=>Live.like('prueba',50)]]
  .forEach(([n,f])=>{const b=document.createElement('button');b.className='sm';b.textContent=n;b.addEventListener('click',()=>{if(!S.running)return;f();});$('tests').appendChild(b);});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(S.running||S.paused))setPause(!S.paused);});
-window.NeonRush={cam:camera,aim,event:Live.onEvent,Live,S,P,spawn:spawnEnemy,enemies:()=>enemies,startGame,useAbility,useUlt,CHARS,CFG,drones:()=>drones,fans,topFans,spawnDrone};
+window.NeonRush={cam:camera,aim,event:Live.onEvent,Live,S,P,spawn:spawnEnemy,enemies:()=>enemies,startGame,useAbility,useUlt,CHARS,CFG,drones:()=>drones,fans,topFans,spawnDrone,A};
 addEventListener('resize',resize);
 
 /* ================= Bucle ================= */
