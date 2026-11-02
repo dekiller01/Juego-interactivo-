@@ -61,6 +61,7 @@ Estado del servidor: `/api/status`.
 | `!ayuda` | un dron aliado con su nombre, 12 s |
 | `!congelar` | congela a todos 3 s |
 | `!disco` | 10 s de luces y puntos x2 |
+| `!medico` | un MÉDICO verde que huye; matarlo te cura |
 | `!siguiente` | pasa a la siguiente canción de tu lista |
 
 **Regalos**: por nombre (rosa, helado/GG, corazón, galaxia, león) activan un efecto propio (pétalos y vida, congelar,
@@ -77,6 +78,35 @@ En la pantalla de inicio, **🎵 MI MÚSICA**: añade varias canciones a la vez 
 el botón ⏭ (arriba a la derecha) y el menú de pausa cambian de canción. Si solo hay una, se repite en bucle.
 
 Usa música libre de derechos: la música comercial puede hacer que TikTok silencie o sancione el directo.
+
+## Rendimiento
+
+⚙ → **RENDIMIENTO** tiene tres modos:
+
+| Modo | Qué hace |
+|---|---|
+| `AUTO` | Mide los FPS y baja o sube solo la resolución y los detalles (5 niveles) para mantener fluidez. En pantallas de 90/120 Hz limita a ~60 FPS. |
+| `AHORRO` | Límite de 30 FPS y menos detalles. Úsalo si el teléfono se calienta transmitiendo. |
+| `MÁXIMO` | Siempre la mejor calidad, sin bajar nada automáticamente. |
+
+⚙ → **MOSTRAR FPS** pone arriba a la izquierda `FPS · RES · nivel · dib`. Si algo sigue lento, esos números ayudan a ajustarlo.
+Los efectos de pantalla (golpe, vida baja, escudo, velocidad) ahora se dibujan en una sola pasada dentro del propio juego.
+
+## Controles y curación
+
+- **Mira fija** en el centro. Arrastra el dedo por la pantalla para girar la cámara (no dispara).
+- **Botón rojo DISPARO**: mantenlo para disparar. Si arrastras el dedo desde el propio botón, giras la cámara y sigues disparando.
+  En ordenador, mantén la tecla `F` o `J`.
+- **Curarte**: los enemigos sueltan **botiquines verdes ✚** (más seguido cuanto menos vida tienes; el que lleva más de 18 s sin soltar uno
+  lo suelta seguro si estás por debajo de la mitad). Se recogen caminando cerca y duran 16 s. Con poca vida aparece un **MÉDICO** verde
+  que huye: al matarlo recuperas el 25 %. Una flecha verde arriba te indica el botiquín o el médico más cercano, y también salen en el radar.
+  Al curarte, la barra de vida brilla en verde.
+
+## Paneles (botón 👁)
+
+Durante la partida, el botón 👁 (arriba a la derecha, junto a ⏭ ☠ ⚙) oculta o muestra al instante el contador de FPS,
+el TOP 3 de fans, la barra de likes y el nombre de la canción. No pausa el juego. Se acuerda de tu elección.
+También está en ⚙ como `PANELES: SÍ/NO`.
 
 ## Aviso
 
