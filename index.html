@@ -472,7 +472,7 @@ const tracers=[]; for(let i=0;i<30;i++){const m=new THREE.Mesh(uBox,new THREE.Me
 let trIdx=0;
 function tracer(a,b,col,w){const t=tracers[trIdx++%tracers.length];const len=a.distanceTo(b);t.m.position.copy(a).lerp(b,.5);t.m.lookAt(b);t.m.scale.set(w||.035,w||.035,len);t.m.material.color.set(col);t.t=1;t.m.visible=true;}
 const bombs=[]; const bombMat=new THREE.MeshBasicMaterial({color:0xffe14d});
-function dropBomb(x,z,dmg){const m=mk(uSph,bombMat,.25,.25,.25,x,HH-.4,z);scene.add(m);bombs.push({m,vy:-2,dmg:dmg||70});}
+function dropBomb(x,z,dmg){const m=mk(uSph,bombMat,.25,.25,.25,x,HH-.4,z);scene.add(m);bombs.push({m,vy:-2,dmg:(dmg||70)*abil()});}
 
 /* ---- arma en mano ---- */
 const gun=new THREE.Group(); camera.add(gun); const gunBase={x:.28,y:-.3};
@@ -664,9 +664,21 @@ function spawnPoint(){
   for(let i=0;i<14;i++){const x=rand(-HX+2,HX-2),z=rand(-HZ+2,HZ-2);if(Math.hypot(x-P.x,z-P.z)>15&&!inPillar(x,z,1.5))return {x,z};}
   return {x:-Math.sign(P.x||1)*18,z:-Math.sign(P.z||1)*18};
 }
+/* vida de los enemigos por nivel: +9 % lineal (como siempre) y, encima, un extra compuesto que sigue el ritmo de las mejoras:
+   ×1.025 por nivel del 12 al 100, ×1.018 del 100 al 130 y ×1.012 a partir del 130 (el daño del jugador crece cada vez más despacio).
+   Medido con simulaciones (t26): sin esto, hacia el nivel 100 el jugador hace 20-40 veces más daño mientras la vida solo sube ×10.
+   Con esta curva, mejoras al azar quedan en ~0.9× de la vida (niveles 10-150); buenas elecciones, 2-4× por delante. */
+const HP_LIN=.09;
+const hpMulAt=L=>(1+(L-1)*HP_LIN)*Math.pow(1.025,clamp(L-12,0,88))*Math.pow(1.018,clamp(L-100,0,30))*Math.pow(1.012,Math.max(0,L-130));
+/* los jefes siguen la misma curva pero algo suavizada (^0.92) para que no tarden una eternidad en niveles altos */
+const bossHpMul=L=>Math.pow(hpMulAt(L),.92)*(1+Math.min(L,24)*.03);
+/* habilidades y regalos (nuke, supernova, tormenta, drones, granadas…) no usan las cartas: su daño sigue a la vida enemiga (80 %) para no quedarse cortos en niveles altos */
+const abil=()=>1+(hpMulAt(S.level)-1)*.8;
+const fmtN=v=>v<10?v.toFixed(2):v<100?v.toFixed(1):String(Math.round(v));
+const fmtDmg=n=>n>=100000?Math.round(n/1000)+'k':n>=10000?(n/1000).toFixed(1)+'k':n;
 function spawnEnemy(name,x,z){
-  const T=TYPES[name]; if(!T) return null; const b=buildEnemy(T); const lv=1+(S.level-1)*0.09; const sp=(x===undefined)?spawnPoint():{x,z};
-  const e={n:name,T,g:b.g,body:b.body,parts:b.parts,hp:T.hp*lv*(T.boss?1+Math.min(S.level,24)*.03:1),r:T.r,age:0,dead:false,flash:0,wind:0,stagger:0,atk:.3,ph:Math.random()*6.28,base:T.sc||1,bc:(T.kind==='dragon'||T.boss)?((Math.random()*4)|0):0,sq:0,cyc:Math.random()*6,vs:0,dir:Math.random()<.5?-1:1,ang:Math.random()*6.28,fuse:0,self:false};
+  const T=TYPES[name]; if(!T) return null; const b=buildEnemy(T); const lv=hpMulAt(S.level); const sp=(x===undefined)?spawnPoint():{x,z};
+  const e={n:name,T,g:b.g,body:b.body,parts:b.parts,hp:T.hp*(T.boss?bossHpMul(S.level):lv),r:T.r,age:0,dead:false,flash:0,wind:0,stagger:0,atk:.3,ph:Math.random()*6.28,base:T.sc||1,bc:(T.kind==='dragon'||T.boss)?((Math.random()*4)|0):0,sq:0,cyc:Math.random()*6,vs:0,dir:Math.random()<.5?-1:1,ang:Math.random()*6.28,fuse:0,self:false};
   e.max=e.hp; e.g.position.set(sp.x,T.kind==='dragon'?5.2:(T.fy!==undefined?T.fy:(T.fly?T.fy:0)),sp.z);
   if(T.fly&&T.kind==='fly')e.g.position.y=rand(1.3,2.6);
   e.baseY=e.g.position.y; e.lx=e.g.position.x; e.lz=e.g.position.z; scene.add(e.g); enemies.push(e); emit(sp.x,.3,sp.z,12,T.col,3,.5,2); if(T.boss||T.kind==='dragon')startPeak(5,'boss'); return e;
@@ -791,7 +803,7 @@ function updKits(dt){
   if(kits.some(k=>k.life<=0)){for(const k of kits)if(k.life<=0)scene.remove(k.g);kits=kits.filter(k=>k.life>0);}
 }
 function damageEnemy(e,dmg,crit,pos,quiet,beat){
-  if(e.dead)return; if(e.bs===3)dmg*=1.5; e.hp-=dmg; e.flash=1; e.sq=1; e.stagger=.25; if(!quiet){dmgNum(pos,Math.round(dmg),(crit?'crit ':'')+(beat?'beat':''));A.hit(crit);}
+  if(e.dead)return; if(e.bs===3)dmg*=1.5; e.hp-=dmg; e.flash=1; e.sq=1; e.stagger=.25; if(!quiet){dmgNum(pos,fmtDmg(Math.round(dmg)),(crit?'crit ':'')+(beat?'beat':''));A.hit(crit);}
   emit(pos.x,pos.y,pos.z,crit?9:4,crit?0xffe14d:e.T.col,4,.35);
   if(e.hp<=0)killEnemy(e);
 }
@@ -853,7 +865,7 @@ function useAbility(){
     P.dash={t:.2,dx:mx/m,dz:mz/m,hit:new Set()}; S.inv=S.t+.35; A.whoosh(); emit(P.x,1,P.z,20,0x19f0ff,5,.5);
   } else if(c.id==='nova'){
     blast(P.x,1,P.z,10,0xff2fd0); ringPulse(P.x,P.z,11,0xff2fd0); A.boom(false); S.shake=.7;
-    for(const e of enemies){if(e.dead)continue;const dx=e.g.position.x-P.x,dz=e.g.position.z-P.z,d=Math.hypot(dx,dz);if(d<10){damageEnemy(e,45,false,e.g.position.clone().add(new Vec(0,e.T.cy||1,0)),false,false);if(!e.dead){e.stagger=.9;const k=3.5/(d||1);e.g.position.x=clamp(e.g.position.x+dx*k,-HX+1,HX-1);e.g.position.z=clamp(e.g.position.z+dz*k,-HZ+1,HZ-1);}}}
+    for(const e of enemies){if(e.dead)continue;const dx=e.g.position.x-P.x,dz=e.g.position.z-P.z,d=Math.hypot(dx,dz);if(d<10){damageEnemy(e,45*abil(),false,e.g.position.clone().add(new Vec(0,e.T.cy||1,0)),false,false);if(!e.dead){e.stagger=.9;const k=3.5/(d||1);e.g.position.x=clamp(e.g.position.x+dx*k,-HX+1,HX-1);e.g.position.z=clamp(e.g.position.z+dz*k,-HZ+1,HZ-1);}}}
     for(const p of projs)if(Math.hypot(p.m.position.x-P.x,p.m.position.z-P.z)<10)removeProj(p);
   } else if(c.id==='echo'){ S.slowT=S.t+4; banner('TIEMPO LENTO','#ffe14d',''); A.chime([440,330,220]); }
   else if(c.id==='titan'){ S.shield=S.t+4; banner('ESCUDO','#ff7a3d',''); A.chime([330,495]); }
@@ -864,7 +876,7 @@ function blinkPlayer(){
   ringPulse(P.x,P.z,5,0x7dff5a); emit(P.x,1,P.z,22,0x7dff5a,5,.5);
   let nx=P.x,nz=P.z; for(let k=.5;k<=9;k+=.5){const tx=clamp(P.x+mx*k,-HX+1,HX-1),tz=clamp(P.z+mz*k,-HZ+1,HZ-1);if(inPillar(tx,tz,.45))break;nx=tx;nz=tz;}
   P.x=nx;P.z=nz;P.vx=P.vz=0; S.inv=S.t+.45; S.punch=Math.max(S.punch,.8); blast(P.x,1,P.z,5,0x7dff5a); emit(P.x,1,P.z,26,0x7dff5a,6,.5); A.whoosh();
-  for(const e of enemies){if(e.dead)continue;const p=e.g.position,d=Math.hypot(p.x-P.x,p.z-P.z);if(d<4){damageEnemy(e,35,false,p.clone().add(new Vec(0,e.T.cy||1,0)),false,false);if(!e.dead)e.stagger=.8;}}
+  for(const e of enemies){if(e.dead)continue;const p=e.g.position,d=Math.hypot(p.x-P.x,p.z-P.z);if(d<4){damageEnemy(e,35*abil(),false,p.clone().add(new Vec(0,e.T.cy||1,0)),false,false);if(!e.dead)e.stagger=.8;}}
 }
 let holeM=null;
 function updHole(dt){
@@ -874,27 +886,26 @@ function updHole(dt){
   emit(h.x+rand(-4,4),rand(.3,3),h.z+rand(-4,4),1,0x7dff5a,1,.4);
   for(const e of enemies){if(e.dead||e.T.kind==='dragon')continue;const p=e.g.position,dx=h.x-p.x,dz=h.z-p.z,d=Math.hypot(dx,dz)||1;if(d<16){const k=Math.min(d,8*dt);p.x+=dx/d*k;p.z+=dz/d*k;}}
   h.t-=dt;
-  if(h.t<=0){explode(h.x,1.2,h.z,9,240,false);blast(h.x,1.2,h.z,12,0x7dff5a);ringPulse(h.x,h.z,14,0x7dff5a);S.shake=Math.max(S.shake,1);S.flash=Math.max(S.flash,.7);S.hole=null;holeM.visible=false;}
+  if(h.t<=0){explode(h.x,1.2,h.z,9,240*abil(),false);blast(h.x,1.2,h.z,12,0x7dff5a);ringPulse(h.x,h.z,14,0x7dff5a);S.shake=Math.max(S.shake,1);S.flash=Math.max(S.flash,.7);S.hole=null;holeM.visible=false;}
 }
 function useUlt(){
   if(!S.running||S.paused||S.over||S.ult<100)return; const c=CHARS[S.char]; S.ult=0;
   if(c.id==='volt'){S.ultFx={k:'storm',t:2.5,n:0};banner('TORMENTA','#19f0ff','');}
   else if(c.id==='nova'){banner('SUPERNOVA','#ff2fd0','');S.flash=1;S.shake=1.2;A.boom(true);blast(P.x,1,P.z,30,0xff2fd0);ringPulse(P.x,P.z,30,0xff2fd0);
-    for(const e of enemies)if(!e.dead)damageEnemy(e,260,false,e.g.position.clone().add(new Vec(0,e.T.cy||1,0)),true,false); for(const p of projs)removeProj(p);}
+    for(const e of enemies)if(!e.dead)damageEnemy(e,260*abil(),false,e.g.position.clone().add(new Vec(0,e.T.cy||1,0)),true,false); for(const p of projs)removeProj(p);}
   else if(c.id==='echo'){S.perks.fast=S.perks.nojam=S.perks.dmg=S.t+6;banner('ECO','#ffe14d','cadencia x2 · daño x2');A.chime([523,784,1047]);}
   else if(c.id==='titan'){S.perks.dmg=S.perks.explosive=S.t+8;S.shield=S.t+2.5;banner('FURIA','#ff7a3d','');A.chime([330,440,660]);}
   else if(c.id==='zero'){const sy=Math.sin(S.yaw),cy=Math.cos(S.yaw);S.hole={x:clamp(P.x-sy*12,-HX+3,HX-3),z:clamp(P.z-cy*12,-HZ+3,HZ-3),t:3};banner('VACÍO','#7dff5a','todo cae hacia el centro');A.boom(true);}
 }
 function stormTick(){
   const cand=enemies.filter(e=>!e.dead); if(!cand.length)return; const e=cand[(Math.random()*cand.length)|0],p=e.g.position;
-  tracer(new Vec(p.x,HH,p.z),new Vec(p.x,p.y+(e.T.cy||1),p.z),'#a8f6ff',.14); damageEnemy(e,60,false,new Vec(p.x,p.y+(e.T.cy||1),p.z),false,false); emit(p.x,1,p.z,10,0x19f0ff,5,.4); A.blip(1500,200,.1,.25,'sawtooth','strike');
+  tracer(new Vec(p.x,HH,p.z),new Vec(p.x,p.y+(e.T.cy||1),p.z),'#a8f6ff',.14); damageEnemy(e,60*abil(),false,new Vec(p.x,p.y+(e.T.cy||1),p.z),false,false); emit(p.x,1,p.z,10,0x19f0ff,5,.4); A.blip(1500,200,.1,.25,'sawtooth','strike');
 }
 
 /* ================= Mejoras entre niveles ================= */
 /* las mejoras SE SUMAN (no se multiplican entre sí del mismo tipo): así el daño crece de forma pareja con la vida de los enemigos */
 function newUp(){return {dmg:1,dmgA:0,rate:1,rateA:0,crit:0,cm:0,mag:1,magA:0,rl:1,pierce:0,explo:0,vamp:0,boss:0,spd:1,spdA:0,wd:[1,1,1,1,1],wdA:[0,0,0,0,0],wpel:[0,0,0,0,0],wpi:[0,0,0,0,0],wj:[1,1,1,1,1],n:0,got:{}};}
 const magOf=i=>Math.round(WEAPONS[i].mag*S.up.mag);
-const hpMulAt=L=>1+(L-1)*.09;
 const UP_EVERY=2;   // pausa de mejoras cada 2 niveles (cámbialo a 3 si se siente muy seguido)
 const TIERN=['COMÚN','RARA','ÉPICA'], TIERC=['#19f0ff','#ff2fd0','#ffe14d'];
 const pctT=v=>Math.round(v*100)+'%';
@@ -932,7 +943,7 @@ function openPick(){
   if(S.pick||!S.running||S.over)return; S.pick=true; S.paused=true; S.pickT=10; S.pickArm=nowS()+.5; fire.down=false; aim.down=false;
   const L=S.level, cards=upRoll(L), cw=(S.cur>=0&&S.cur<4)?S.cur:1; S.pickCards=cards;
   $('upT').textContent='MEJORA · NIVEL '+L;
-  $('upS').textContent='Enemigos ×'+hpMulAt(L).toFixed(2)+' de vida · Tu daño ×'+(S.up.dmg*S.up.wd[cw]).toFixed(2)+' · elige una';
+  $('upS').textContent='Enemigos ×'+fmtN(hpMulAt(L))+' de vida · Tu daño ×'+fmtN(S.up.dmg*S.up.wd[cw])+' · elige una';
   upCards.textContent='';
   cards.forEach((k,i)=>{const b=document.createElement('button');b.className='uc';b.style.setProperty('--tc',TIERC[k.t]);
     const a=document.createElement('small');a.textContent=TIERN[k.t];const ic=document.createElement('i');ic.textContent=k.c.ic;const n=document.createElement('b');n.textContent=k.c.n;const d=document.createElement('span');d.textContent=k.d;
@@ -1234,7 +1245,7 @@ function update(dt,rdt){
   let mx=-sy*jy+cy*jx, mz=-cy*jy-sy*jx; const m=Math.hypot(mx,mz); if(m>1){mx/=m;mz/=m;}
   const spd=6.8*ch.spd*S.up.spd*(S.boost>0?1.4:1)*(1+.28*S.peakK+.08*S.tension)/(1+.4*S.stuck); S.boost=Math.max(0,S.boost-rdt);
   if(P.dash){ P.dash.t-=rdt; P.vx=P.dash.dx*26; P.vz=P.dash.dz*26; emit(P.x,1,P.z,2,0x19f0ff,1.5,.4);
-    for(const e of enemies){if(e.dead||P.dash.hit.has(e))continue;if(Math.hypot(e.g.position.x-P.x,e.g.position.z-P.z)<2){P.dash.hit.add(e);damageEnemy(e,30,false,e.g.position.clone().add(new Vec(0,e.T.cy||1,0)),false,false);e.stagger=.6;}}
+    for(const e of enemies){if(e.dead||P.dash.hit.has(e))continue;if(Math.hypot(e.g.position.x-P.x,e.g.position.z-P.z)<2){P.dash.hit.add(e);damageEnemy(e,30*abil(),false,e.g.position.clone().add(new Vec(0,e.T.cy||1,0)),false,false);e.stagger=.6;}}
     if(P.dash.t<=0)P.dash=null; }
   else { P.vx=lerp(P.vx,mx*spd,clamp(rdt*12,0,1)); P.vz=lerp(P.vz,mz*spd,clamp(rdt*12,0,1)); }
   P.x=clamp(P.x+P.vx*rdt,-HX+.8,HX-.8); P.z=clamp(P.z+P.vz*rdt,-HZ+.8,HZ-.8); pushOut(P,.5); P.speed=Math.hypot(P.vx,P.vz);
@@ -1346,7 +1357,7 @@ function updDrones(dt){
     p.x+=(tx-p.x)*k; p.y+=(ty-p.y)*k; p.z+=(tz-p.z)*k; d.ring.rotation.z+=dt*9;
     d.cd-=dt;
     if(d.cd<=0){let b=null,bd=26;for(const e of enemies){if(e.dead)continue;const q=e.g.position,dd=Math.hypot(q.x-p.x,q.z-p.z);if(dd<bd){bd=dd;b=e;}}
-      if(b){d.cd=.45;const q=b.g.position,hit=new Vec(q.x,q.y+(b.T.cy||1),q.z);tracer(p.clone(),hit,d.col,.05);damageEnemy(b,13,false,hit,true,false);A.blip(1600,700,.04,.06,'square','drn');} else d.cd=.2;}
+      if(b){d.cd=.45;const q=b.g.position,hit=new Vec(q.x,q.y+(b.T.cy||1),q.z);tracer(p.clone(),hit,d.col,.05);damageEnemy(b,13*abil(),false,hit,true,false);A.blip(1600,700,.04,.06,'square','drn');} else d.cd=.2;}
     if(d.t<=0){emit(p.x,p.y,p.z,14,d.col,4,.5);scene.remove(d.g);d.lab.material.map.dispose();d.lab.material.dispose();drones.splice(i,1);}
   }
 }
@@ -1370,7 +1381,7 @@ const Live={
     if(d<5){healPlayer(8);ammo[S.cur]=magOf(S.cur);S.ult=Math.min(100,S.ult+8);emit(P.x,1.5,P.z-2,24,0xff6ec7,5,.8,2);A.chime([880,1175]);}
     else if(d<30){banner('LLUVIA DE GRANADAS','#ffe14d','@'+user);bombsAround(3+Math.min(6,Math.floor(d/8)),80);spawnDrone(user,10);}
     else if(d<200){if(S.minigunT<=0)S.prev=S.cur>=0&&S.cur<4?S.cur:S.prev;S.minigunT=12;S.cur=-1;selectWeapon(4,true);ammo[4]=WEAPONS[4].mag;banner('MINIGUN','#ff2fd0','12 s · @'+user);addPerk(pickPerk(),10);spawnDrone(user,15);spawnDrone(user,15);}
-    else{banner('NUKE','#ffffff','@'+user);S.flash=1;S.shake=1.4;A.boom(true);for(const e of enemies)if(!e.dead)damageEnemy(e,9999,false,e.g.position.clone().add(new Vec(0,1,0)),true,false);for(const p of projs)removeProj(p);healPlayer(25);S.ult=100;if(d>=1000){for(const k in PERKS)S.perks[k]=S.t+15;}}
+    else{banner('NUKE','#ffffff','@'+user);S.flash=1;S.shake=1.4;A.boom(true);for(const e of enemies)if(!e.dead)damageEnemy(e,Math.max(9999,e.max*(e.T.boss?.5:1.01)),false,e.g.position.clone().add(new Vec(0,1,0)),true,false);for(const p of projs)removeProj(p);healPlayer(25);S.ult=100;if(d>=1000){for(const k in PERKS)S.perks[k]=S.t+15;}}
   },
   chat(user,text){
     if(!S.running||S.over)return; const t=String(text||'').trim().toLowerCase(); if(!t.startsWith('!'))return; const c=t.split(/\s+/)[0];
@@ -1552,7 +1563,7 @@ $('wsUrl').value=CFG.ws; $('wsBtn').addEventListener('click',wsConnect); syncTog
  ['!ump',()=>Live.chat('prueba','!ump')],['!escopeta',()=>Live.chat('prueba','!escopeta')],['!sniper',()=>Live.chat('prueba','!sniper')],['!granada',()=>Live.chat('prueba','!granada')],['!boss',()=>spawnMany('boss',SP.mult)],['!dragon',()=>spawnMany('dragon',SP.mult)],['!creeper',()=>Live.chat('prueba','!creeper')],['!lento',()=>Live.chat('prueba','!lento')],['!caos',()=>Live.chat('prueba','!caos')],['❤ Like ×50',()=>Live.like('prueba',50)]]
  .forEach(([n,f])=>{const b=document.createElement('button');b.className='sm';b.textContent=n;b.addEventListener('click',()=>{if(!S.running)return;f();});$('tests').appendChild(b);});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(S.running||S.paused)&&!S.pick)setPause(!S.paused);});
-window.NeonRush={cam:camera,aim,fire,openPick,pickCard,upRoll,hpMulAt,UPC,WUP,newUp,shoot,ammo,bossAttack,kits:()=>kits,dropKit,kill:killEnemy,event:Live.onEvent,Live,S,P,spawn:spawnEnemy,enemies:()=>enemies,startGame,useAbility,useUlt,CHARS,CFG,drones:()=>drones,fans,topFans,spawnDrone,A,PERF,QL,renderer,scene,setQL:i=>setQL(i),ql:()=>ql,fxMat};
+window.NeonRush={cam:camera,aim,fire,openPick,pickCard,upRoll,hpMulAt,bossHpMul,abil,UPC,WUP,newUp,shoot,ammo,bossAttack,kits:()=>kits,dropKit,kill:killEnemy,event:Live.onEvent,Live,S,P,spawn:spawnEnemy,enemies:()=>enemies,startGame,useAbility,useUlt,CHARS,CFG,drones:()=>drones,fans,topFans,spawnDrone,A,PERF,QL,renderer,scene,setQL:i=>setQL(i),ql:()=>ql,fxMat};
 addEventListener('resize',resize);
 
 /* ================= Rendimiento ================= */

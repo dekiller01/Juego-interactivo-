@@ -104,15 +104,18 @@ Los efectos de pantalla (golpe, vida baja, escudo, velocidad) ahora se dibujan e
 
 ## Dificultad, jefes y mejoras
 
-- La vida de los enemigos sube **+9 % por nivel sin tope** (nivel 10 = ×1,81, nivel 30 = ×3,61). Los jefes tienen un extra más suave
-  (+3 % por nivel hasta el 24) y como máximo hay 2 jefes a la vez por el director.
+- La vida de los enemigos sube **+9 % por nivel** y, además, un extra compuesto que sigue el ritmo de tus mejoras: **×1,025 por nivel del 12 al 100,
+  ×1,018 del 100 al 130 y ×1,012 después**. Resultado: nivel 10 = ×1,8 · nivel 30 = ×5,6 · nivel 50 = ×14 · nivel 100 = ×87 · nivel 150 = ×274.
+  A nivel 100 un zombi tiene ≈3.100 de vida y tu UMP (mejoras al azar) hace 200-400 por bala. La curva está en `hpMulAt` (en `index.html`).
+  Los jefes siguen la misma curva algo suavizada (^0,92) más su extra de +3 % por nivel hasta el 24, y como máximo hay 2 jefes a la vez.
+  Las habilidades y regalos (granadas, drones, supernova, tormenta, vacío…) escalan con la vida enemiga, y el NUKE mata todo menos jefes (a esos les quita el 50 %).
 - **Pausa de mejoras**: cada 2 niveles (2, 4, 6…) el juego se detiene unos segundos (la música sigue) y eliges 1 de 3 cartas. La pantalla muestra la vida
   de los enemigos (`Enemigos ×1,81`) y tu daño actual. Si no eliges, a los 10 s se toma la primera carta (siempre es de poder: daño, cadencia, puntería o tu arma actual).
   Tarda 0,5 s en aceptar toques para evitar elecciones sin querer. En `index.html` está `UP_EVERY` si quieres que sea cada 3 niveles.
 - Cartas: 🔥 DAÑO · ⚡ CADENCIA · 🎯 PUNTERÍA (crítico) · 🔋 CARGADOR · ➶ PERFORANTE · 💥 EXPLOSIVAS · 🩸 VAMPIRISMO · 👑 CAZAJEFES · 🛡 BLINDAJE · 👟 ZAPATILLAS
   y una por arma (PISTOLA+, UMP+, ESCOPETA+, SNIPER+). Cada una sale COMÚN, RARA o ÉPICA; con el nivel suben la probabilidad de rara/épica y un poco los valores.
 - Las mejoras del mismo tipo **se suman** (no se multiplican), así tu daño crece parejo con la vida: con cartas al azar andas cerca de la vida
-  de los enemigos (≈0,8× en el nivel 10 y ≈1,0× en el 30); eligiendo bien vas por delante y con mala suerte un poco por detrás, sin quedarte atascado.
+  de los enemigos (≈0,9× desde el nivel 10 hasta el 150); eligiendo bien vas 2-4× por delante y con mala suerte un poco por detrás, sin quedarte atascado.
 - El jefe ya no se queda parado en el centro: persigue (sin frenarse cuando le disparas), rodea los pilares y, al ritmo de la música, alterna **¡SALTO!**
   (marca una zona rosa donde estás y cae encima), **¡EMBESTIDA!**, **¡RÁFAGA!**, **¡ONDA DE FUEGO!** y **¡REFUERZOS!**. Tras saltar o embestir queda
   **¡ABIERTO!** ~1,5 s (azulado, +50 % de daño). Con menos de la mitad de vida se enfurece.
