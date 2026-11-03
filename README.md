@@ -102,6 +102,29 @@ Los efectos de pantalla (golpe, vida baja, escudo, velocidad) ahora se dibujan e
   que huye: al matarlo recuperas el 25 %. Una flecha verde arriba te indica el botiquín o el médico más cercano, y también salen en el radar.
   Al curarte, la barra de vida brilla en verde.
 
+## Dificultad, jefes y mejoras
+
+- La vida de los enemigos sube **+9 % por nivel sin tope** (nivel 10 = ×1,81, nivel 30 = ×3,61). Los jefes tienen un extra más suave
+  (+3 % por nivel hasta el 24) y como máximo hay 2 jefes a la vez por el director.
+- **Pausa de mejoras**: cada 2 niveles (2, 4, 6…) el juego se detiene unos segundos (la música sigue) y eliges 1 de 3 cartas. La pantalla muestra la vida
+  de los enemigos (`Enemigos ×1,81`) y tu daño actual. Si no eliges, a los 10 s se toma la primera carta (siempre es de poder: daño, cadencia, puntería o tu arma actual).
+  Tarda 0,5 s en aceptar toques para evitar elecciones sin querer. En `index.html` está `UP_EVERY` si quieres que sea cada 3 niveles.
+- Cartas: 🔥 DAÑO · ⚡ CADENCIA · 🎯 PUNTERÍA (crítico) · 🔋 CARGADOR · ➶ PERFORANTE · 💥 EXPLOSIVAS · 🩸 VAMPIRISMO · 👑 CAZAJEFES · 🛡 BLINDAJE · 👟 ZAPATILLAS
+  y una por arma (PISTOLA+, UMP+, ESCOPETA+, SNIPER+). Cada una sale COMÚN, RARA o ÉPICA; con el nivel suben la probabilidad de rara/épica y un poco los valores.
+- Las mejoras del mismo tipo **se suman** (no se multiplican), así tu daño crece parejo con la vida: con cartas al azar andas cerca de la vida
+  de los enemigos (≈0,8× en el nivel 10 y ≈1,0× en el 30); eligiendo bien vas por delante y con mala suerte un poco por detrás, sin quedarte atascado.
+- El jefe ya no se queda parado en el centro: persigue (sin frenarse cuando le disparas), rodea los pilares y, al ritmo de la música, alterna **¡SALTO!**
+  (marca una zona rosa donde estás y cae encima), **¡EMBESTIDA!**, **¡RÁFAGA!**, **¡ONDA DE FUEGO!** y **¡REFUERZOS!**. Tras saltar o embestir queda
+  **¡ABIERTO!** ~1,5 s (azulado, +50 % de daño). Con menos de la mitad de vida se enfurece.
+
+## Cómo seguir añadiendo cosas sin que se ponga pesado
+
+Reglas que se siguen en cada mejora: reutilizar geometrías y materiales (nunca crear uno nuevo por enemigo o disparo), reutilizar objetos en vez de
+crear y borrar (los proyectiles ya se reciclan), poner un **tope** a todo lo que se pueda acumular (proyectiles ≤ 90, zonas ≤ 12, drones ≤ 8, botiquines ≤ 3),
+no usar luces dinámicas ni transparencias grandes superpuestas, y no tocar el HTML en cada fotograma. Además, cada cambio se mide con un banco de pruebas
+con una escena muy cargada (2 jefes, ~25 enemigos, drones, proyectiles) comparando fotogramas por segundo, milisegundos de código por fotograma, llamadas de dibujo y memoria
+antes y después. El selector de rendimiento (AUTO/AHORRO/MÁXIMO) baja la calidad solo si el teléfono no aguanta.
+
 ## Paneles (botón 👁)
 
 Durante la partida, el botón 👁 (arriba a la derecha, junto a ⏭ ☠ ⚙) oculta o muestra al instante el contador de FPS,
