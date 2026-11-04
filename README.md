@@ -79,6 +79,10 @@ el botón ⏭ (arriba a la derecha) y el menú de pausa cambian de canción. Si 
 
 Usa música libre de derechos: la música comercial puede hacer que TikTok silencie o sancione el directo.
 
+**Anillo de latido**: un anillo se cierra sobre la mira y llega justo en el siguiente latido; ahí destella. Disparar en ese instante
+(~0,1 s) da el bono de daño al ritmo. Se redibuja solo en cada latido, así que no cuesta nada de rendimiento. Con canciones tuyas el latido
+se detecta sobre la marcha, por lo que puede adelantarse o atrasarse un poco; con la música del juego es casi exacto.
+
 ## Rendimiento
 
 ⚙ → **RENDIMIENTO** tiene tres modos:
@@ -119,6 +123,15 @@ Los efectos de pantalla (golpe, vida baja, escudo, velocidad) ahora se dibujan e
 - El jefe ya no se queda parado en el centro: persigue (sin frenarse cuando le disparas), rodea los pilares y, al ritmo de la música, alterna **¡SALTO!**
   (marca una zona rosa donde estás y cae encima), **¡EMBESTIDA!**, **¡RÁFAGA!**, **¡ONDA DE FUEGO!** y **¡REFUERZOS!**. Tras saltar o embestir queda
   **¡ABIERTO!** ~1,5 s (azulado, +50 % de daño). Con menos de la mitad de vida se enfurece.
+- **El jefe es el tanque**: mientras haya un jefe vivo, el **60 % del daño de tus balas contra mobs pequeños pasa al jefe** (los mobs solo reciben
+  el 40 %; sale un rayo magenta del mob al jefe) y los mobs pequeños van **+20 % más rápidos y pegan +25 % más** (brillan en magenta al ritmo).
+  Así que lo que más conviene es matar al jefe primero. No afecta a dragones, fénix, médicos ni a habilidades y regalos (el NUKE sigue igual).
+  Al caer el jefe, el enlace y el bono se acaban y los mobs quedan aturdidos 1 s. El 60 % es `TANK_LINK` en `index.html`.
+- **Los enemigos aprenden**: el juego anota cómo juegas (qué arma llevas, cuánto te mueves, a qué distancia aciertas) con memoria de ~40 s, y
+  hasta el **35 %** de lo que aparece sale de una lista que contrarresta eso (con sniper: más veloces y esquivos; con UMP: más tanques y
+  divisores; con escopeta: más a distancia; si te quedas quieto: más escupidores y explosivos; si corres: más toros y corredores). Empieza en
+  el nivel 3 y llega al máximo en el nivel 12. Avisa **una sola vez** ("LOS ENEMIGOS APRENDEN", sin decir a qué) la primera vez que se juega.
+  Si cambias de arma o de estilo, se adaptan de nuevo. Cuesta microsegundos y 0 dibujos extra. Tope en `LEARN_MAX`.
 
 ## Cómo seguir añadiendo cosas sin que se ponga pesado
 

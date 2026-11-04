@@ -81,8 +81,11 @@ body.play #fpsd.on{display:block}
 body:not(.play) #fans,body:not(.play) #likes{display:none}
 @keyframes xh{50%{transform:translate(-50%,-50%) scale(1.35)}}
 #xb{width:46px;height:46px;border:2px solid var(--c1);opacity:0}
-#xb.on{animation:xbeat .3s ease-out}
-@keyframes xbeat{from{opacity:.9;transform:translate(-50%,-50%) scale(1.9)}to{opacity:0;transform:translate(-50%,-50%) scale(1)}}
+#xb.on{animation:xbeat var(--bp,.48s) linear}
+@keyframes xbeat{0%{opacity:0;transform:translate(-50%,-50%) scale(2.5)}35%{opacity:.55}100%{opacity:.95;transform:translate(-50%,-50%) scale(1)}}
+#xw{width:46px;height:46px;border:3px solid #fff;box-shadow:0 0 14px var(--c1),inset 0 0 8px var(--c1);opacity:0}
+#xw.on{animation:xwin .18s ease-out}
+@keyframes xwin{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.45)}}
 #xt{left:0;top:-42px!important;transform:translate(-50%,0)!important;font-family:var(--disp);font-size:11px;font-weight:800;letter-spacing:.14em;white-space:nowrap;color:var(--bad);border-radius:0!important;text-shadow:0 0 6px #000;opacity:0}
 #xt.on{animation:xtx .8s ease-out}
 @keyframes xtx{0%{opacity:1}70%{opacity:1}100%{opacity:0}}
@@ -250,7 +253,7 @@ input[type=range]{flex:1;accent-color:var(--c2);touch-action:pan-x;height:28px}
 </div>
 
 <div id="aimzone"></div>
-<div id="cross"><div id="xb"></div><div id="xr"></div><div id="xd"></div><div id="xt">ATASCADA</div></div>
+<div id="cross"><div id="xb"></div><div id="xw"></div><div id="xr"></div><div id="xd"></div><div id="xt">ATASCADA</div></div>
 <div id="joyzone"><div id="joybase"><div id="knob"></div></div></div>
 <canvas id="radar" width="92" height="92"></canvas>
 <div id="wbar"></div>
@@ -692,7 +695,36 @@ function domBand(){
   if(A.mode==='file'){const a=A.rb,b=A.rm*1.15,c=A.rt*1.3,m=Math.max(a,b,c);return m===a?'bass':m===b?'mid':'treb';}
   const r=Math.random();return r<.4-.15*S.diff?'bass':r<.75?'mid':'treb';
 }
+/* ---- Los enemigos aprenden: perfil del jugador -> sesgo suave de lo que aparece (máx. 35 %, crece con el nivel) ---- */
+const MINLV={}; for(const k in POOLS)for(const q of POOLS[k])MINLV[q[0]]=Math.min(MINLV[q[0]]||99,q[2]);
+const COUNTER=[ /* por arma: [tipo, peso] de lo que mejor la contrarresta */
+ [['charger',1],['spitter',1],['runner',1]],              /* pistola: equilibrada */
+ [['tank',2],['splitter',2],['bomber',1]],                /* UMP: aguantan ráfagas */
+ [['spitter',2],['drone',2],['phantom',1]],               /* escopeta: no te dejan acercarte */
+ [['runner',2],['charger',2],['phantom',2],['drone',1]]   /* sniper: rápidos y esquivos */
+];
+const LEARN_MAX=.35;
+const newProf=()=>({w:[0,0,0,0],mov:.5,dist:12,p:0,cw:[],t:2,said:0});
+function profThink(){
+  const f=S.prof; if(!f)return; let sum=0; for(const x of f.w)sum+=x;
+  const conf=clamp(sum/25,0,1), ramp=clamp((S.level-2)/10,0,1), cw={}, add=(l,k)=>{for(const c of l)cw[c[0]]=(cw[c[0]]||0)+c[1]*k;};
+  if(sum>0)for(let i=0;i<4;i++)add(COUNTER[i],f.w[i]/sum);
+  if(f.mov<.3)add([['spitter',2],['bomber',2],['drone',1]],.7); else if(f.mov>.75)add([['charger',2],['runner',2]],.5);
+  if(f.dist>17)add([['phantom',2],['charger',2],['drone',1]],.6); else if(f.dist<7)add([['spitter',2],['bomber',1]],.5);
+  f.cw=Object.keys(cw).filter(n=>(MINLV[n]||1)<=S.level).map(n=>[n,cw[n]]);
+  f.p=f.cw.length?LEARN_MAX*conf*ramp:0;
+  /* un único aviso, genérico y solo la primera vez que se juega */
+  if(f.p>.08&&!f.said){f.said=1;if(!store.get('nbr.learn',0)){store.set('nbr.learn',1);banner('LOS ENEMIGOS APRENDEN','#ff2fd0','');}}
+}
+function profTick(dt){
+  const f=S.prof; if(!f)return;
+  const k=Math.exp(-dt/40); for(let i=0;i<4;i++)f.w[i]*=k; if(S.cur>=0&&S.cur<4)f.w[S.cur]+=dt;
+  f.mov+=((Math.hypot(P.vx,P.vz)>1.2?1:0)-f.mov)*Math.min(1,dt*.12);
+  f.t-=dt; if(f.t<=0){f.t=2;profThink();}
+}
 function pickType(band){
+  const f=S.prof;
+  if(f&&f.p>0&&Math.random()<f.p){let sm=0;for(const c of f.cw)sm+=c[1];let r=Math.random()*sm;for(const c of f.cw){r-=c[1];if(r<=0)return c[0];}}
   const pool=POOLS[band||domBand()].filter(p=>p[2]<=S.level); let sum=0; for(const p of pool)sum+=p[1]; let r=Math.random()*sum;
   for(const p of pool){r-=p[1];if(r<=0)return p[0];} return 'walker';
 }
@@ -822,7 +854,7 @@ function killEnemy(e){
   if(T.bomb)explode(p.x,p.y,p.z,4.5,70,true,30);
   if(T.ai==='flee'&&!e.self){const n=Math.round(S.maxHp*.25);healPlayer(n);dmgNum(new Vec(p.x,p.y+2.2,p.z),'+'+n+' ❤','heal');emit(P.x,1.3,P.z,26,0x5dff9b,4,.8,2);emit(p.x,1.5,p.z,30,0x5dff9b,5,.7,2);A.chime([660,880,1320,1760]);banner('MÉDICO ABATIDO','#5dff9b','+'+n+' SALUD');}
   else if(!e.self&&!T.boss&&T.kind!=='dragon')maybeKit(p);
-  if(T.boss){explode(p.x,1,p.z,7,150,true,35);addScore(2000);healPlayer(30);banner('JEFE ABATIDO','#ffe14d','+2000');addPerk(pickPerk(),10);A.chime([392,523,659,784,1047]);}
+  if(T.boss){for(const m of enemies)if(!m.dead&&!m.T.boss&&m.T.kind!=='dragon')m.stagger=Math.max(m.stagger,1);ringPulse(p.x,p.z,18,0xffe14d);explode(p.x,1,p.z,7,150,true,35);addScore(2000);healPlayer(30);banner('JEFE ABATIDO','#ffe14d','+2000');addPerk(pickPerk(),10);A.chime([392,523,659,784,1047]);}
   if(T.kind==='dragon'){blast(p.x,p.y,p.z,6,0xff5a1f);A.boom(true);S.shake=.8;healPlayer(12);banner(T.n+' ABATIDO',T.alt?'#2fd3ff':'#ff7a1a','+1000');addScore(1000);addPerk(pickPerk(),10);}
   if(T.split){for(let i=0;i<2;i++)spawnEnemy('mini',clamp(p.x+rand(-1,1),-HX+1,HX-1),clamp(p.z+rand(-1,1),-HZ+1,HZ-1));}
 }
@@ -1012,6 +1044,16 @@ function shoot(){
   if(firstHit&&(act('explosive')||Math.random()<S.up.explo))explode(firstHit.x,firstHit.y,firstHit.z,2.4,(w.dmin+w.dmax)*.6*S.up.dmg*S.up.wd[S.cur],false);
   if(ammo[S.cur]<=0)startReload();
 }
+/* ---- Jefe tanque: mientras haya un jefe vivo, el 60 % de tus balas contra mobs pequeños se transfiere al jefe y los
+   mobs pequeños van +20 % más rápidos y pegan +25 % más. Solo cuenta el disparo del jugador (habilidades y regalos no cambian). ---- */
+const TANK_LINK=.6;
+function tankLink(e,dmg){
+  const b=S.tankE; if(!b||b.dead||e===b||e.T.boss||e.T.kind==='dragon'||e.T.ai==='flee'||dmg<=0)return dmg;
+  const mv=dmg*TANK_LINK, bp=b.g.position;
+  damageEnemy(b,mv,false,new Vec(bp.x,bp.y+(b.T.cy||1),bp.z),true,false);
+  if(S.t>=(S.linkT||0)){S.linkT=S.t+.08;const a=e.g.position.clone();a.y+=e.T.cy||1;const c=bp.clone();c.y+=b.T.cy||1;tracer(a,c,'#ff2fd0',.05);}
+  return dmg-mv;
+}
 function resolveShot(Dv,w,onBeat){
   const O=camera.position; let maxT=70;
   if(Dv.x>1e-4)maxT=Math.min(maxT,(HX-O.x)/Dv.x);else if(Dv.x<-1e-4)maxT=Math.min(maxT,(-HX-O.x)/Dv.x);
@@ -1034,6 +1076,7 @@ function resolveShot(Dv,w,onBeat){
     if(w.falloff)dmg*=clamp(1.3-h.t/22,.3,1); if(pierced>0)dmg*=.7; if(h.head)dmg*=1.35;
     const crit=Math.random()<w.crit+ch.crit+S.up.crit+(h.head?.3:0); if(crit)dmg*=w.cm+S.up.cm; if(onBeat)dmg*=ch.beat;
     const hp=new Vec(O.x+Dv.x*h.t,O.y+Dv.y*h.t,O.z+Dv.z*h.t); const kb=w.kb*.25; const dd=Math.hypot(h.e.g.position.x-O.x,h.e.g.position.z-O.z)||1; if(h.e.T.ai!=='dragon'){h.e.g.position.x+=(h.e.g.position.x-O.x)/dd*kb;h.e.g.position.z+=(h.e.g.position.z-O.z)/dd*kb;}
+    if(S.prof)S.prof.dist+=(h.t-S.prof.dist)*.06; if(S.tankE)dmg=tankLink(h.e,dmg);
     damageEnemy(h.e,dmg,crit,hp,false,onBeat); pierced++; endT=h.t; hit=true; if(!pt)pt=hp;
   }
   if(!hit&&endT>=maxT-0.01){emit(O.x+Dv.x*endT,O.y+Dv.y*endT,O.z+Dv.z*endT,3,0xffffff,2.5,.25);}
@@ -1046,9 +1089,10 @@ function startReload(){if(S.reload)return;const w=WEAPONS[S.cur];S.reload={t:0,d
 function fireBeat(){
   const now=nowS(); const iv=now-A.lastBeat; if(iv>.2&&iv<2)A.bps=lerp(A.bps,1/iv,.18); A.lastBeat=now; A.beatN++;
   S.pulse=1; S.hue=(S.hue+.012)%1;
-  FX.beat=.9; const xb=$('xb'); xb.classList.remove('on'); void xb.offsetWidth; xb.classList.add('on');
+  FX.beat=.9; const xb=$('xb'), xw=$('xw'); xb.style.setProperty('--bp',clamp(1/A.bps,.25,1.1).toFixed(3)+'s'); xb.classList.remove('on'); xw.classList.remove('on'); void xb.offsetWidth; xb.classList.add('on'); xw.classList.add('on');
   if(!S.running||S.paused||S.over)return;
   ringPulse(P.x,P.z,22,0x19f0ff); if(S.discoT>S.t)confetti(5);
+  if(S.tankE&&!S.tankE.dead)ringPulse(S.tankE.g.position.x,S.tankE.g.position.z,15,0xff2fd0);
   const frz=S.freezeT>S.t;
   for(const e of enemies){ if(e.dead)continue; e.bc++; const T=e.T;
     if(frz)continue;
@@ -1077,6 +1121,7 @@ function startPeak(dur,why){
   banner('¡CLÍMAX!','#ff3b5c',why==='drop'?'la canción explota':'esto se pone tenso'); A.impact(); S.shake=Math.max(S.shake,.5); S.flash=Math.max(S.flash,.5);
 }
 function updateDirector(dt){
+  profTick(dt);
   const acc=S.rH/(S.rS+4), accN=clamp(acc/.7,0,1), react=clamp(1-(S.killTime-2.5)/6,0,1), kr=clamp(S.killRate*.8,0,1);
   const skill=.4*accN+.35*react+.25*kr;
   S.diff=lerp(S.diff,clamp(.4*skill+.35*A.intensity+.25*Math.min(S.level/8,1),0,1),dt*.6); S.killRate=Math.max(0,S.killRate-dt*.06); A.drift=S.diff*.12;
@@ -1086,7 +1131,7 @@ function updateDirector(dt){
 function newLevel(){
   S.level++; healPlayer(15); banner('NIVEL '+S.level,'#19f0ff','la música aprieta'); A.chime([523,659,784]);
   if(S.level%UP_EVERY===0){S.pickQ=(S.pickQ||0)+1;if(!S.pickAt)S.pickAt=nowS()+.9;}
-  if(S.level%4===0){const nb=1+Math.floor(S.level/8);for(let i=0;i<nb&&countOf('boss')<2;i++)spawnEnemy('boss');setTimeout(()=>banner(nb>1?'¡JEFES!':'¡JEFE!','#ff2fd0',''),1300);}
+  if(S.level%4===0){const nb=1+Math.floor(S.level/8);for(let i=0;i<nb&&countOf('boss')<2;i++)spawnEnemy('boss');setTimeout(()=>banner(nb>1?'¡JEFES!':'¡JEFE!','#ff2fd0',nb>1?'protegen a los suyos · mátalos primero':'protege a los suyos · mátalo primero'),1300);}
 }
 function updDying(dt){for(let i=dying.length-1;i>=0;i--){const e=dying[i];e.dieT-=dt;const k=Math.max(0,e.dieT/.35);e.g.scale.setScalar(e.base*Math.max(.01,k)*(1+(1-k)*.4));e.g.rotation.y+=dt*12;e.g.position.y+=dt*(e.T.kind==='dragon'?-4:2.5);e.body.emissive.setRGB(1,1,1);if(e.dieT<=0){scene.remove(e.g);dying.splice(i,1);}}}
 function blinkEnemy(e){const p=e.g.position; emit(p.x,p.y,p.z,14,e.T.col,4,.4); const a=Math.random()*6.283,d=rand(6,10); p.x=clamp(P.x+Math.cos(a)*d,-HX+1.5,HX-1.5); p.z=clamp(P.z+Math.sin(a)*d,-HZ+1.5,HZ-1.5); e.lx=p.x; e.lz=p.z; emit(p.x,p.y,p.z,14,e.T.col,4,.4); A.blip(1200,300,.1,.12,'sine','blink');}
@@ -1156,24 +1201,26 @@ function updBoss(e,dt,dist,nx,nz){
 function chargeAI(e,dt,dist,nx,nz,sp){
   const pos=e.g.position,T=e.T; e.cs=e.cs||0; e.ct=(e.ct||0)-dt;
   if(e.cs===0){
-    if(dist>T.r+1.2){pos.x+=nx*sp*dt;pos.z+=nz*sp*dt;} else {e.atk-=dt;if(e.atk<=0){e.atk=.8;hurtPlayer(T.dmg*.6);}}
+    if(dist>T.r+1.2){pos.x+=nx*sp*dt;pos.z+=nz*sp*dt;} else {e.atk-=dt;if(e.atk<=0){e.atk=.8;hurtPlayer(T.dmg*.6*(e.buf?1.25:1));}}
     if(dist<16&&dist>5&&e.age>1.2){e.cs=1;e.ct=.8;A.blip(240,700,.3,.2,'sawtooth','chg');}
   } else if(e.cs===1){
     e.wind=1; e.cdx=nx; e.cdz=nz; if(e.ct<=0){e.cs=2;e.ct=1;e.hitP=0;A.whoosh();}
   } else if(e.cs===2){
     pos.x+=e.cdx*17*dt; pos.z+=e.cdz*17*dt; emit(pos.x,.5,pos.z,1,T.col,1.5,.3);
-    if(!e.hitP&&dist<T.r+1.2){e.hitP=1;hurtPlayer(T.dmg);S.shake=Math.max(S.shake,.7);e.cs=3;e.ct=1.3;}
+    if(!e.hitP&&dist<T.r+1.2){e.hitP=1;hurtPlayer(T.dmg*(e.buf?1.25:1));S.shake=Math.max(S.shake,.7);e.cs=3;e.ct=1.3;}
     else if(e.ct<=0||Math.abs(pos.x)>HX-1.2||Math.abs(pos.z)>HZ-1.2){e.cs=3;e.ct=1.3;}
   } else if(e.ct<=0){e.cs=0;}
 }
 function updateEnemies(dt){
   const spdMul=.85+.5*S.diff, lunge=.5+1.2*S.pulse; let stuck=0;
+  let tb=null; for(const e of enemies)if(!e.dead&&e.T.boss){tb=e;break;} S.tankE=tb;
   for(const e of enemies){
     if(e.dead)continue; const g=e.g,T=e.T,pos=g.position; e.age+=dt; e.flash=Math.max(0,e.flash-dt*7); e.stagger=Math.max(0,e.stagger-dt); e.wind=Math.max(0,e.wind-dt*1.2);
     if(S.freezeT>S.t){e.body.emissive.setRGB(0,.22+.12*Math.sin(e.age*18),.55);e.lx=pos.x;e.lz=pos.z;continue;}
     const dx=P.x-pos.x,dz=P.z-pos.z,dist=Math.hypot(dx,dz)||.001,nx=dx/dist,nz=dz/dist;
     if(e.parts.sh){const big=T.boss||T.kind==='dragon',v=!!SHELLS&&(dist<24||big);if(e.shOn!==v){e.shOn=v;for(const m of e.parts.sh)m.visible=v;}if(e.parts.ey){const ve=dist<30||big;if(e.eyOn!==ve){e.eyOn=ve;for(const m of e.parts.ey)m.visible=ve;}}}
-    const sp=T.spd*spdMul*lunge*(e.stagger>0?.3:1);
+    e.buf=!!tb&&!T.boss&&T.kind!=='dragon'&&T.ai!=='flee';
+    const sp=T.spd*spdMul*lunge*(e.stagger>0?.3:1)*(e.buf?1.2:1);
     if(T.ai==='dragon'){
       e.ang+=dt*.32*e.dir; const tx=clamp(P.x+Math.cos(e.ang)*13,-HX+2,HX-2),tz=clamp(P.z+Math.sin(e.ang)*13,-HZ+2,HZ-2);
       pos.x+=(tx-pos.x)*Math.min(1,dt*1.5); pos.z+=(tz-pos.z)*Math.min(1,dt*1.5); pos.y=5.2+Math.sin(e.age*1.3+e.ph)*.8;
@@ -1193,7 +1240,7 @@ function updateEnemies(dt){
     } else {
       const rng=T.r+1.0+(T.boss?1.5:0);
       if(dist>rng){const zg=T.zig?Math.sin(e.age*5+e.ph)*2.4:0;pos.x+=nx*sp*dt+(-nz)*zg*dt;pos.z+=nz*sp*dt+nx*zg*dt;}
-      else if(!T.bomb){e.atk-=dt;if(e.atk<=0){e.atk=.8;hurtPlayer(T.dmg);}}
+      else if(!T.bomb){e.atk-=dt;if(e.atk<=0){e.atk=.8;hurtPlayer(T.dmg*(e.buf?1.25:1));}}
       if(T.bomb){ if(!e.fuse&&dist<3.6){e.fuse=1.1;A.blip(900,900,.1,.2,'square');} if(e.fuse>0){e.fuse-=dt;if(e.fuse<=0){e.self=true;killEnemy(e);continue;}} }
       if(dist<T.r+1.7)stuck++;
     }
@@ -1226,7 +1273,7 @@ function updateEnemies(dt){
     }
     if(e.lyy)pos.y+=e.lyy; if(e.bs===4){sy*=.78;sx*=1.12;}
     g.scale.set(sc*sx,sc*sy,sc*sx);
-    e.body.emissive.setRGB(Math.max(e.flash,e.wind,fz),Math.max(e.flash,fz),Math.max(e.flash,fz));
+    const bfx=e.buf?.14+.22*S.pulse:0; e.body.emissive.setRGB(Math.max(e.flash,e.wind,fz,bfx),Math.max(e.flash,fz),Math.max(e.flash,fz,bfx*.9));
     if(e.bs===3)e.body.emissive.setRGB(e.flash,Math.max(e.flash,.3),Math.max(e.flash,.5));
   }
   // separación
@@ -1457,7 +1504,7 @@ $('ttBtn').addEventListener('click',async()=>{
 function resetGame(){
   for(const e of dying)scene.remove(e.g); dying=[]; for(const e of enemies)scene.remove(e.g); enemies=[]; for(const p of projs)removeProj(p); projs=[]; for(const z of zones)scene.remove(z.m); zones=[]; for(const b of bombs)scene.remove(b.m); bombs.length=0; clearDrones(); for(const k of kits)scene.remove(k.g); kits=[]; if(holeM)holeM.visible=false; $('likeFill').style.transform='scaleX(0)';
   const c=CHARS[S.char];
-  Object.assign(S,{over:false,t:0,score:0,combo:0,comboT:0,maxCombo:0,kills:0,hp:c.hp,maxHp:c.hp,level:1,boost:0,minigunT:0,wcd:0,reload:null,shots:0,hits:0,rS:0,rH:0,killTime:4,killRate:0,diff:.3,shake:0,slowT:0,spawnT:1.5,perks:{},hurtT:0,likes:0,slowmo:1,acd:0,ult:0,inv:0,shield:0,ultFx:null,stuck:0,pitch:0,yaw:0,tension:0,peak:0,peakK:0,peakCd:5,punch:0,dutch:0,hitStop:0,dropSlow:0,bobT:0,freezeT:0,discoT:0,lookX:0,lookY:0,hole:null,kitT:0,medCd:8,up:newUp(),pick:false,pickQ:0,pickAt:0});
+  Object.assign(S,{over:false,t:0,score:0,combo:0,comboT:0,maxCombo:0,kills:0,hp:c.hp,maxHp:c.hp,level:1,boost:0,minigunT:0,wcd:0,reload:null,shots:0,hits:0,rS:0,rH:0,killTime:4,killRate:0,diff:.3,shake:0,slowT:0,spawnT:1.5,perks:{},hurtT:0,likes:0,slowmo:1,acd:0,ult:0,inv:0,shield:0,ultFx:null,stuck:0,pitch:0,yaw:0,tension:0,peak:0,peakK:0,peakCd:5,punch:0,dutch:0,hitStop:0,dropSlow:0,bobT:0,freezeT:0,discoT:0,lookX:0,lookY:0,hole:null,kitT:0,medCd:8,up:newUp(),pick:false,pickQ:0,pickAt:0,prof:newProf(),tankE:null,linkT:0});
   $('up').classList.remove('on');
   P.x=0;P.z=8;P.vx=P.vz=0;P.speed=0;P.dash=null; WEAPONS.forEach((w,i)=>ammo[i]=w.mag); S.cur=-1; S.prev=1; selectWeapon(1,true); cross.classList.remove('rel'); lastHud={}; $('feed').innerHTML=''; A.beatN=0; A.drop=false; A.phase='intro'; setupChar();
 }
@@ -1563,7 +1610,7 @@ $('wsUrl').value=CFG.ws; $('wsBtn').addEventListener('click',wsConnect); syncTog
  ['!ump',()=>Live.chat('prueba','!ump')],['!escopeta',()=>Live.chat('prueba','!escopeta')],['!sniper',()=>Live.chat('prueba','!sniper')],['!granada',()=>Live.chat('prueba','!granada')],['!boss',()=>spawnMany('boss',SP.mult)],['!dragon',()=>spawnMany('dragon',SP.mult)],['!creeper',()=>Live.chat('prueba','!creeper')],['!lento',()=>Live.chat('prueba','!lento')],['!caos',()=>Live.chat('prueba','!caos')],['❤ Like ×50',()=>Live.like('prueba',50)]]
  .forEach(([n,f])=>{const b=document.createElement('button');b.className='sm';b.textContent=n;b.addEventListener('click',()=>{if(!S.running)return;f();});$('tests').appendChild(b);});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(S.running||S.paused)&&!S.pick)setPause(!S.paused);});
-window.NeonRush={cam:camera,aim,fire,openPick,pickCard,upRoll,hpMulAt,bossHpMul,abil,UPC,WUP,newUp,shoot,ammo,bossAttack,kits:()=>kits,dropKit,kill:killEnemy,event:Live.onEvent,Live,S,P,spawn:spawnEnemy,enemies:()=>enemies,startGame,useAbility,useUlt,CHARS,CFG,drones:()=>drones,fans,topFans,spawnDrone,A,PERF,QL,renderer,scene,setQL:i=>setQL(i),ql:()=>ql,fxMat};
+window.NeonRush={prof:()=>S.prof,profThink,profTick,pickType,tankLink,tankE:()=>S.tankE,dir:updateDirector,cam:camera,aim,fire,openPick,pickCard,upRoll,hpMulAt,bossHpMul,abil,UPC,WUP,newUp,shoot,ammo,bossAttack,kits:()=>kits,dropKit,kill:killEnemy,event:Live.onEvent,Live,S,P,spawn:spawnEnemy,enemies:()=>enemies,startGame,useAbility,useUlt,CHARS,CFG,drones:()=>drones,fans,topFans,spawnDrone,A,PERF,QL,renderer,scene,setQL:i=>setQL(i),ql:()=>ql,fxMat};
 addEventListener('resize',resize);
 
 /* ================= Rendimiento ================= */
