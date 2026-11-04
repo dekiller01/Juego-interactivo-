@@ -111,7 +111,10 @@ Los efectos de pantalla (golpe, vida baja, escudo, velocidad) ahora se dibujan e
 - La vida de los enemigos sube **+9 % por nivel** y, además, un extra compuesto que sigue el ritmo de tus mejoras: **×1,025 por nivel del 12 al 100,
   ×1,018 del 100 al 130 y ×1,012 después**. Resultado: nivel 10 = ×1,8 · nivel 30 = ×5,6 · nivel 50 = ×14 · nivel 100 = ×87 · nivel 150 = ×274.
   A nivel 100 un zombi tiene ≈3.100 de vida y tu UMP (mejoras al azar) hace 200-400 por bala. La curva está en `hpMulAt` (en `index.html`).
-  Los jefes siguen la misma curva algo suavizada (^0,92) más su extra de +3 % por nivel hasta el 24, y como máximo hay 2 jefes a la vez.
+  Los jefes tienen la misma curva completa, más +3 % por nivel hasta el 24, +0,4 % por nivel desde el 40 y **+35 % de tu bonificación CAZAJEFES**
+  (cuantas más cartas CAZAJEFES apiles, más vida tienen al aparecer). Como máximo hay 2 jefes a la vez. Con el ejemplo del nivel 129 y 6 CAZAJEFES:
+  ≈1,07 millones de vida (antes ≈313.000). **Daño del jefe**: +0,8 % por nivel desde el 20 (×1,9 en el 129, tope ×2,2) y ataca más seguido
+  desde el nivel 60 (1 latido menos entre ataques) y el 100 (2 menos). Se ajusta con `bossHpMul`, `bossDmg` y `bossTempo` en `index.html`.
   Las habilidades y regalos (granadas, drones, supernova, tormenta, vacío…) escalan con la vida enemiga, y el NUKE mata todo menos jefes (a esos les quita el 50 %).
 - **Pausa de mejoras**: cada 2 niveles (2, 4, 6…) el juego se detiene unos segundos (la música sigue) y eliges 1 de 3 cartas. La pantalla muestra la vida
   de los enemigos (`Enemigos ×1,81`) y tu daño actual. Si no eliges, a los 10 s se toma la primera carta (siempre es de poder: daño, cadencia, puntería o tu arma actual).
@@ -123,15 +126,20 @@ Los efectos de pantalla (golpe, vida baja, escudo, velocidad) ahora se dibujan e
 - El jefe ya no se queda parado en el centro: persigue (sin frenarse cuando le disparas), rodea los pilares y, al ritmo de la música, alterna **¡SALTO!**
   (marca una zona rosa donde estás y cae encima), **¡EMBESTIDA!**, **¡RÁFAGA!**, **¡ONDA DE FUEGO!** y **¡REFUERZOS!**. Tras saltar o embestir queda
   **¡ABIERTO!** ~1,5 s (azulado, +50 % de daño). Con menos de la mitad de vida se enfurece.
-- **El jefe es el tanque**: mientras haya un jefe vivo, el **60 % del daño de tus balas contra mobs pequeños pasa al jefe** (los mobs solo reciben
-  el 40 %; sale un rayo magenta del mob al jefe) y los mobs pequeños van **+20 % más rápidos y pegan +25 % más** (brillan en magenta al ritmo).
-  Así que lo que más conviene es matar al jefe primero. No afecta a dragones, fénix, médicos ni a habilidades y regalos (el NUKE sigue igual).
-  Al caer el jefe, el enlace y el bono se acaban y los mobs quedan aturdidos 1 s. El 60 % es `TANK_LINK` en `index.html`.
+- **El jefe es el tanque**: mientras haya un jefe vivo, el **95 % del daño de tus balas contra cualquier mob (pequeños, dragones y fénix) pasa al jefe**
+  (el mob solo recibe el 5 %; sale un rayo magenta del mob al jefe) y los mobs pequeños van **+20 % más rápidos y pegan +25 % más** (brillan en magenta
+  al ritmo). Así que hay que matar al jefe primero, y ningún disparo se pierde porque todos le llegan. No afecta al médico (el tuyo), al sanador
+  (para poder matarlo) ni a habilidades y regalos (el NUKE sigue igual). Al caer el jefe, el enlace y el bono se acaban y los mobs quedan aturdidos 1 s.
+  El 95 % es `TANK_LINK` en `index.html`.
+- **SANADOR** (blanco con cruz y halo cian): desde el nivel 15 aparece uno (2 desde el 60, 3 desde el 125) que se queda a 12-18 m de ti y, en cada
+  latido, **cura el 3 % de la vida máxima de todos los mobs menos el jefe** (brillan en verde agua y sale un anillo). Es frágil y se libra del enlace
+  del jefe: mátalo primero si no quieres que los demás se regeneren. Ajustes: `HEALER_FROM` y `HEAL_PCT`.
 - **Los enemigos aprenden**: el juego anota cómo juegas (qué arma llevas, cuánto te mueves, a qué distancia aciertas) con memoria de ~40 s, y
-  hasta el **35 %** de lo que aparece sale de una lista que contrarresta eso (con sniper: más veloces y esquivos; con UMP: más tanques y
+  hasta el **55 %** de lo que aparece sale de una lista que contrarresta eso (con sniper: más veloces y esquivos; con UMP: más tanques y
   divisores; con escopeta: más a distancia; si te quedas quieto: más escupidores y explosivos; si corres: más toros y corredores). Empieza en
   el nivel 3 y llega al máximo en el nivel 12. Avisa **una sola vez** ("LOS ENEMIGOS APRENDEN", sin decir a qué) la primera vez que se juega.
-  Si cambias de arma o de estilo, se adaptan de nuevo. Cuesta microsegundos y 0 dibujos extra. Tope en `LEARN_MAX`.
+  Desde el nivel 125 el tope sube +0,4 % por nivel hasta el **75 %** (nivel 175). Si cambias de arma o de estilo, se adaptan de nuevo.
+  Cuesta microsegundos y 0 dibujos extra. Tope en `LEARN_MAX`.
 
 ## Cómo seguir añadiendo cosas sin que se ponga pesado
 

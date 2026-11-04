@@ -469,7 +469,7 @@ function updParticles(dt){
 }
 const blasts=[]; for(let i=0;i<8;i++){const m=new THREE.Mesh(uSph,new THREE.MeshBasicMaterial({color:0xffaa33,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));m.visible=false;scene.add(m);blasts.push({m,t:0,r:1});}
 function blast(x,y,z,r,col){const b=blasts.find(b=>b.t<=0)||blasts[0];b.t=1;b.r=r;b.m.position.set(x,y,z);b.m.material.color.set(col||0xffaa33);b.m.visible=true;}
-const rings=[]; for(let i=0;i<4;i++){const m=new THREE.Mesh(new THREE.RingGeometry(.94,1,64),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));m.rotation.x=-Math.PI/2;m.visible=false;scene.add(m);rings.push({m,t:0,r:20});}
+const rings=[]; for(let i=0;i<7;i++){const m=new THREE.Mesh(new THREE.RingGeometry(.94,1,64),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));m.rotation.x=-Math.PI/2;m.visible=false;scene.add(m);rings.push({m,t:0,r:20});}
 function ringPulse(x,z,r,col){const g=rings.find(g=>g.t<=0)||rings[0];g.t=1;g.r=r;g.m.position.set(x,.05,z);g.m.material.color.set(col);g.m.visible=true;}
 const tracers=[]; for(let i=0;i<30;i++){const m=new THREE.Mesh(uBox,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));m.visible=false;scene.add(m);tracers.push({m,t:0});}
 let trIdx=0;
@@ -634,9 +634,10 @@ const TYPES={
  charger:{n:'TORO',hp:90,spd:3,r:.8,cy:1.2,hy:2.2,hr:.38,col:0xff4a2a,score:35,dmg:18,sc:1.25,ai:'charge',kind:'human'},
  phantom:{n:'FANTASMA',hp:40,spd:3.2,r:.55,cy:0,col:0x9fb4ff,score:30,dmg:9,fly:true,ai:'blink',kind:'fly',fy:1.8},
  phoenix:{n:'FÉNIX',hp:260,spd:1,r:1.6,cy:0,col:0x2fd3ff,score:300,dmg:12,ai:'dragon',kind:'dragon',fly:true,sc:1.1,alt:true},
- medic:{n:'MÉDICO',hp:40,spd:3.5,r:.55,cy:.95,hy:1.75,hr:.3,col:0x2bff7a,score:15,dmg:0,sc:1,ai:'flee',kind:'human'}
+ medic:{n:'MÉDICO',hp:40,spd:3.5,r:.55,cy:.95,hy:1.75,hr:.3,col:0x2bff7a,score:15,dmg:0,sc:1,ai:'flee',kind:'human'},
+ healer:{n:'SANADOR',hp:80,spd:3.3,r:.55,cy:.95,hy:1.75,hr:.3,col:0xe4fff8,score:60,dmg:0,sc:1.05,ai:'heal',kind:'human'}
 };
-const haloMat=new THREE.MeshBasicMaterial({color:0x5dff9b});
+const haloMat=new THREE.MeshBasicMaterial({color:0x5dff9b}), healHaloMat=new THREE.MeshBasicMaterial({color:0x7dfff0});
 function buildEnemy(T){
   const g=new THREE.Group(); g.rotation.order='YXZ'; const body=new THREE.MeshLambertMaterial({color:T.col,emissive:0x000000}); const sh=shellMat(T.col); const parts={};
   if(T.kind==='fly'){
@@ -658,7 +659,7 @@ function buildEnemy(T){
     {const e1=mk(uBox,matEye,.1,.06,.05,-.11,1.78,.28),e2=mk(uBox,matEye,.1,.06,.05,.11,1.78,.28),s1=mk(uBox,sh,.95,1.15,.65,0,1.05,0),s2=mk(uSph,sh,.38,.38,.38,0,1.75,0);parts.ey=[e1,e2];parts.sh=[s1,s2];g.add(torso,head,parts.armL,parts.armR,parts.legL,parts.legR,e1,e2,s1,s2);}
     if(T.boss){g.add(mk(uCone,matDark,.18,.7,.18,-.25,2.25,0));g.add(mk(uCone,matDark,.18,.7,.18,.25,2.25,0));}
     if(T.ai==='spit')g.add(mk(uSph,new THREE.MeshBasicMaterial({color:0x7dffd8}),.22,.22,.22,0,1.3,.4));
-    if(T.ai==='flee'){g.add(mk(uBox,matEye,.5,.14,.05,0,1.1,.34),mk(uBox,matEye,.14,.5,.05,0,1.1,.34));const h=mk(uTor,haloMat,.34,.34,.34,0,2.2,0);h.rotation.x=Math.PI/2;g.add(h);parts.halo=h;}
+    if(T.ai==='flee'||T.ai==='heal'){g.add(mk(uBox,matEye,.5,.14,.05,0,1.1,.34),mk(uBox,matEye,.14,.5,.05,0,1.1,.34));const h=mk(uTor,T.ai==='heal'?healHaloMat:haloMat,.34,.34,.34,0,2.2,0);h.rotation.x=Math.PI/2;g.add(h);parts.halo=h;}
     g.scale.setScalar(T.sc);
   }
   return {g,body,parts};
@@ -672,16 +673,18 @@ function spawnPoint(){
    Medido con simulaciones (t26): sin esto, hacia el nivel 100 el jugador hace 20-40 veces más daño mientras la vida solo sube ×10.
    Con esta curva, mejoras al azar quedan en ~0.9× de la vida (niveles 10-150); buenas elecciones, 2-4× por delante. */
 const HP_LIN=.09;
+const bossDmg=()=>1+clamp(S.level-20,0,150)*.008;
+const bossTempo=()=>S.level>=100?2:S.level>=60?1:0;
 const hpMulAt=L=>(1+(L-1)*HP_LIN)*Math.pow(1.025,clamp(L-12,0,88))*Math.pow(1.018,clamp(L-100,0,30))*Math.pow(1.012,Math.max(0,L-130));
 /* los jefes siguen la misma curva pero algo suavizada (^0.92) para que no tarden una eternidad en niveles altos */
-const bossHpMul=L=>Math.pow(hpMulAt(L),.92)*(1+Math.min(L,24)*.03);
+const bossHpMul=L=>hpMulAt(L)*(1+Math.min(L,24)*.03)*(1+clamp(L-40,0,120)*.004);   /* + (1+CAZAJEFES×.35) al aparecer */
 /* habilidades y regalos (nuke, supernova, tormenta, drones, granadas…) no usan las cartas: su daño sigue a la vida enemiga (80 %) para no quedarse cortos en niveles altos */
 const abil=()=>1+(hpMulAt(S.level)-1)*.8;
 const fmtN=v=>v<10?v.toFixed(2):v<100?v.toFixed(1):String(Math.round(v));
 const fmtDmg=n=>n>=100000?Math.round(n/1000)+'k':n>=10000?(n/1000).toFixed(1)+'k':n;
 function spawnEnemy(name,x,z){
   const T=TYPES[name]; if(!T) return null; const b=buildEnemy(T); const lv=hpMulAt(S.level); const sp=(x===undefined)?spawnPoint():{x,z};
-  const e={n:name,T,g:b.g,body:b.body,parts:b.parts,hp:T.hp*(T.boss?bossHpMul(S.level):lv),r:T.r,age:0,dead:false,flash:0,wind:0,stagger:0,atk:.3,ph:Math.random()*6.28,base:T.sc||1,bc:(T.kind==='dragon'||T.boss)?((Math.random()*4)|0):0,sq:0,cyc:Math.random()*6,vs:0,dir:Math.random()<.5?-1:1,ang:Math.random()*6.28,fuse:0,self:false};
+  const e={n:name,T,g:b.g,body:b.body,parts:b.parts,hp:T.hp*(T.boss?bossHpMul(S.level)*(1+(S.up.boss||0)*.35):lv),r:T.r,age:0,dead:false,flash:0,wind:0,stagger:0,atk:.3,ph:Math.random()*6.28,base:T.sc||1,bc:(T.kind==='dragon'||T.boss)?((Math.random()*4)|0):0,sq:0,cyc:Math.random()*6,vs:0,dir:Math.random()<.5?-1:1,ang:Math.random()*6.28,fuse:0,self:false};
   e.max=e.hp; e.g.position.set(sp.x,T.kind==='dragon'?5.2:(T.fy!==undefined?T.fy:(T.fly?T.fy:0)),sp.z);
   if(T.fly&&T.kind==='fly')e.g.position.y=rand(1.3,2.6);
   e.baseY=e.g.position.y; e.lx=e.g.position.x; e.lz=e.g.position.z; scene.add(e.g); enemies.push(e); emit(sp.x,.3,sp.z,12,T.col,3,.5,2); if(T.boss||T.kind==='dragon')startPeak(5,'boss'); return e;
@@ -703,7 +706,7 @@ const COUNTER=[ /* por arma: [tipo, peso] de lo que mejor la contrarresta */
  [['spitter',2],['drone',2],['phantom',1]],               /* escopeta: no te dejan acercarte */
  [['runner',2],['charger',2],['phantom',2],['drone',1]]   /* sniper: rápidos y esquivos */
 ];
-const LEARN_MAX=.35;
+const LEARN_MAX=.55;   /* hasta el 55 % de las apariciones; desde el nivel 125 sube +0,4 % por nivel hasta el 75 % */
 const newProf=()=>({w:[0,0,0,0],mov:.5,dist:12,p:0,cw:[],t:2,said:0});
 function profThink(){
   const f=S.prof; if(!f)return; let sum=0; for(const x of f.w)sum+=x;
@@ -712,7 +715,7 @@ function profThink(){
   if(f.mov<.3)add([['spitter',2],['bomber',2],['drone',1]],.7); else if(f.mov>.75)add([['charger',2],['runner',2]],.5);
   if(f.dist>17)add([['phantom',2],['charger',2],['drone',1]],.6); else if(f.dist<7)add([['spitter',2],['bomber',1]],.5);
   f.cw=Object.keys(cw).filter(n=>(MINLV[n]||1)<=S.level).map(n=>[n,cw[n]]);
-  f.p=f.cw.length?LEARN_MAX*conf*ramp:0;
+  f.p=f.cw.length?(LEARN_MAX+clamp(S.level-125,0,50)*.004)*conf*ramp:0;
   /* un único aviso, genérico y solo la primera vez que se juega */
   if(f.p>.08&&!f.said){f.said=1;if(!store.get('nbr.learn',0)){store.set('nbr.learn',1);banner('LOS ENEMIGOS APRENDEN','#ff2fd0','');}}
 }
@@ -782,7 +785,7 @@ function volley(e,n,spread,kind){
   const p=e.g.position,ty=1.3; const base=Math.atan2(P.x-p.x,P.z-p.z); A.whoosh();
   for(let i=0;i<n;i++){const a=base+(i-(n-1)/2)*spread;fireProj(p.x,p.y+.2,p.z,Math.sin(a)*Math.hypot(P.x-p.x,P.z-p.z),ty-(p.y+.2),Math.cos(a)*Math.hypot(P.x-p.x,P.z-p.z),13,12,kind||'fire');}
 }
-function bossRing(e){const p=e.g.position;A.whoosh();for(let i=0;i<10;i++){const a=i/10*6.283;fireProj(p.x,1.4,p.z,Math.sin(a),0,Math.cos(a),8,10,'fire');}}
+function bossRing(e){const p=e.g.position;A.whoosh();for(let i=0;i<10;i++){const a=i/10*6.283;fireProj(p.x,1.4,p.z,Math.sin(a),0,Math.cos(a),8,10*bossDmg(),'fire');}}
 function spit(e){const p=e.g.position;fireProj(p.x,1.3,p.z,P.x-p.x,1.3-1.3,P.z-p.z,10,8,'acid');A.blip(500,250,.1,.2,'sawtooth','spit');}
 
 /* ================= Daño / puntuación ================= */
@@ -1044,11 +1047,18 @@ function shoot(){
   if(firstHit&&(act('explosive')||Math.random()<S.up.explo))explode(firstHit.x,firstHit.y,firstHit.z,2.4,(w.dmin+w.dmax)*.6*S.up.dmg*S.up.wd[S.cur],false);
   if(ammo[S.cur]<=0)startReload();
 }
-/* ---- Jefe tanque: mientras haya un jefe vivo, el 60 % de tus balas contra mobs pequeños se transfiere al jefe y los
-   mobs pequeños van +20 % más rápidos y pegan +25 % más. Solo cuenta el disparo del jugador (habilidades y regalos no cambian). ---- */
-const TANK_LINK=.6;
+/* ---- Jefe tanque: mientras haya un jefe vivo, el 95 % de tus balas contra mobs (pequeños, dragones y fénix) se transfiere al jefe
+   y los mobs pequeños van +20 % más rápidos y pegan +25 % más. Se libran el médico (el tuyo) y el sanador (para poder matarlo).
+   Solo cuenta el disparo del jugador (habilidades y regalos no cambian). ---- */
+const TANK_LINK=.95;
+const HEALER_FROM=15, HEAL_PCT=.03;   /* el sanador cura el 3 % de la vida máx. de cada mob (menos el jefe) en cada latido */
+function healWave(h){
+  const hp=h.g.position; let n=0;
+  for(const m of enemies){ if(m.dead||m.T.boss||m.T.ai==='flee'||m.hp>=m.max)continue; m.hp=Math.min(m.max,m.hp+m.max*HEAL_PCT); m.hl=1; n++; }
+  if(n)ringPulse(hp.x,hp.z,10,0x7dfff0);
+}
 function tankLink(e,dmg){
-  const b=S.tankE; if(!b||b.dead||e===b||e.T.boss||e.T.kind==='dragon'||e.T.ai==='flee'||dmg<=0)return dmg;
+  const b=S.tankE; if(!b||b.dead||e===b||e.T.boss||e.T.ai==='flee'||e.T.ai==='heal'||dmg<=0)return dmg;
   const mv=dmg*TANK_LINK, bp=b.g.position;
   damageEnemy(b,mv,false,new Vec(bp.x,bp.y+(b.T.cy||1),bp.z),true,false);
   if(S.t>=(S.linkT||0)){S.linkT=S.t+.08;const a=e.g.position.clone();a.y+=e.T.cy||1;const c=bp.clone();c.y+=b.T.cy||1;tracer(a,c,'#ff2fd0',.05);}
@@ -1100,6 +1110,7 @@ function fireBeat(){
     else if(T.ai==='blink'){ if(e.bc%4===0)blinkEnemy(e); }
     else if(T.ai==='spit'){ if(e.bc%3===0&&Math.hypot(P.x-e.g.position.x,P.z-e.g.position.z)<26)spit(e); }
     else if(T.boss){ bossBeat(e); }
+    else if(T.ai==='heal'){ healWave(e); }
   }
   S.dutchT=(S.dutchT>0?-1:1)*.07;
   const dropNow=A.drop; A.drop=false; if(dropNow)startPeak(7,'drop');
@@ -1125,6 +1136,8 @@ function updateDirector(dt){
   const acc=S.rH/(S.rS+4), accN=clamp(acc/.7,0,1), react=clamp(1-(S.killTime-2.5)/6,0,1), kr=clamp(S.killRate*.8,0,1);
   const skill=.4*accN+.35*react+.25*kr;
   S.diff=lerp(S.diff,clamp(.4*skill+.35*A.intensity+.25*Math.min(S.level/8,1),0,1),dt*.6); S.killRate=Math.max(0,S.killRate-dt*.06); A.drift=S.diff*.12;
+  S.healCd=(S.healCd||0)-dt; const maxH=S.level>=125?3:S.level>=60?2:1;
+  if(S.level>=HEALER_FROM&&S.healCd<=0&&enemies.length>=6&&countOf('healer')<maxH){S.healCd=S.level>=100?16:26;if(spawnEnemy('healer')&&!S.healSaid){S.healSaid=1;banner('¡SANADOR!','#7dfff0','cura a los demás · mátalo primero');}}
   S.medCd=(S.medCd||0)-dt; if(S.hp<S.maxHp*.55&&S.medCd<=0&&countOf('medic')===0){S.medCd=S.hp<S.maxHp*.3?16:26;if(spawnEnemy('medic'))banner('¡MÉDICO!','#5dff9b','mátalo para curarte');}
   S.spawnT-=dt; if(S.spawnT<=0){S.spawnT=lerp(3.2,1.2,S.diff)*rand(.8,1.2)/(PHM[A.phase]||1);if(enemies.length<maxEnemies())spawnGroup(1+((Math.random()*(1+S.level*.3+S.diff*2))|0));}
 }
@@ -1143,7 +1156,7 @@ function slam(x,z,r,dmg){
 }
 function bossVolley(e){
   const p=e.g.position; A.whoosh(); const base=Math.atan2(P.x-p.x,P.z-p.z), dd=Math.hypot(P.x-p.x,P.z-p.z)||1;
-  for(let i=-2;i<=2;i++){const a=base+i*.17;fireProj(p.x,2.2,p.z,Math.sin(a)*dd,1.3-2.2,Math.cos(a)*dd,13,12,'fire');}
+  for(let i=-2;i<=2;i++){const a=base+i*.17;fireProj(p.x,2.2,p.z,Math.sin(a)*dd,1.3-2.2,Math.cos(a)*dd,13,12*bossDmg(),'fire');}
 }
 function bossEnd(e){e.bs=0;e.nb=Math.max(e.nb||0,e.bc+4);}
 function bossAttack(e){
@@ -1160,7 +1173,7 @@ function bossAttack(e){
 function bossBeat(e){
   if(e.bs)return; if(e.nb===undefined)e.nb=e.bc+5+((Math.random()*3)|0);
   if(e.bc===e.nb-1)e.wind=1;
-  if(e.bc>=e.nb){e.nb=e.bc+(e.enr?6:9);bossAttack(e);}
+  if(e.bc>=e.nb){e.nb=e.bc+Math.max(4,(e.enr?6:9)-bossTempo());bossAttack(e);}
 }
 function updBoss(e,dt,dist,nx,nz){
   const pos=e.g.position,T=e.T,s=e.bs||0; e.bt=(e.bt||0)-dt; e.lyy=0;
@@ -1173,12 +1186,12 @@ function updBoss(e,dt,dist,nx,nz){
       pos.x+=nx*sp*dt;pos.z+=nz*sp*dt;
       if(e.age>1&&e.vs<sp*.3)e.stk=(e.stk||0)+dt; else e.stk=Math.max(0,(e.stk||0)-dt*2);
       if(e.stk>.7){e.stk=0;e.sideT=1.5;e.dir=-e.dir;}                 // atascado en un pilar: rodéalo
-    } else {e.atk-=dt;if(e.atk<=0){e.atk=.9;hurtPlayer(T.dmg);}}
+    } else {e.atk-=dt;if(e.atk<=0){e.atk=.9;hurtPlayer(T.dmg*bossDmg());}}
   } else if(s===1){
     e.wind=1; if(e.bt<=0){e.cdx=nx;e.cdz=nz;e.bs=2;e.bt=1.25;e.hitP=0;A.whoosh();}
   } else if(s===2){
     pos.x+=e.cdx*15*dt;pos.z+=e.cdz*15*dt; emit(pos.x,.5,pos.z,2,T.col,2,.4);
-    if(!e.hitP&&dist<T.r+1.2){e.hitP=1;hurtPlayer(T.dmg);S.shake=Math.max(S.shake,.8);}
+    if(!e.hitP&&dist<T.r+1.2){e.hitP=1;hurtPlayer(T.dmg*bossDmg());S.shake=Math.max(S.shake,.8);}
     if(e.bt<=0||Math.abs(pos.x)>HX-1.8||Math.abs(pos.z)>HZ-1.8){e.bs=3;e.bt=1.6;blast(pos.x,.3,pos.z,4,0xff2fd0);A.boom(false);S.shake=Math.max(S.shake,.5);bossMsg('¡ABIERTO! DISPARA');}
   } else if(s===3){
     if(e.bt<=0)bossEnd(e);                                           // aturdido: recibe +50 % de daño
@@ -1186,7 +1199,7 @@ function updBoss(e,dt,dist,nx,nz){
     e.wind=1; if(e.bt<=0){e.bs=5;e.bt=.55;}
   } else if(s===5){
     const u=1-clamp(e.bt/.55,0,1); pos.x=lerp(e.lx0,e.tx,u);pos.z=lerp(e.lz0,e.tz,u); e.lyy=Math.sin(u*Math.PI)*5.5;
-    if(e.bt<=0){pos.x=e.tx;pos.z=e.tz;e.lyy=0;slam(e.tx,e.tz,4.4,T.dmg);e.bs=3;e.bt=1.2;bossMsg('¡ABIERTO! DISPARA');}
+    if(e.bt<=0){pos.x=e.tx;pos.z=e.tz;e.lyy=0;slam(e.tx,e.tz,4.4,T.dmg*bossDmg());e.bs=3;e.bt=1.2;bossMsg('¡ABIERTO! DISPARA');}
   } else if(s===7){
     e.wind=1; if(e.bt<=0){
       for(let i=0;i<3;i++){const a=i/3*6.283+Math.random(),d=rand(2.8,3.8);spawnEnemy(i===1?'runner':'walker',clamp(pos.x+Math.cos(a)*d,-HX+1.5,HX-1.5),clamp(pos.z+Math.sin(a)*d,-HZ+1.5,HZ-1.5));}
@@ -1233,6 +1246,11 @@ function updateEnemies(dt){
       pos.x+=(fx*.8+(-nz)*e.dir*.7)*sp*dt; pos.z+=(fz*.8+nx*e.dir*.7)*sp*dt;
       if(e.parts.halo)e.parts.halo.rotation.z+=dt*3;
       if(e.age>34){e.self=true;killEnemy(e);continue;}
+    } else if(T.ai==='heal'){
+      e.fl=(e.fl||0)-dt; if(e.fl<=0){e.fl=rand(1.5,3);e.dir=Math.random()<.5?-1:1;}
+      const fx=dist<12?-nx:(dist>18?nx:0), fz=dist<12?-nz:(dist>18?nz:0);
+      pos.x+=(fx*.8+(-nz)*e.dir*.7)*sp*dt; pos.z+=(fz*.8+nx*e.dir*.7)*sp*dt;
+      if(e.parts.halo)e.parts.halo.rotation.z+=dt*3;
     } else if(T.ai==='boss'){
       updBoss(e,dt,dist,nx,nz); if(dist<T.r+1.7)stuck++;
     } else if(T.ai==='charge'){
@@ -1273,7 +1291,7 @@ function updateEnemies(dt){
     }
     if(e.lyy)pos.y+=e.lyy; if(e.bs===4){sy*=.78;sx*=1.12;}
     g.scale.set(sc*sx,sc*sy,sc*sx);
-    const bfx=e.buf?.14+.22*S.pulse:0; e.body.emissive.setRGB(Math.max(e.flash,e.wind,fz,bfx),Math.max(e.flash,fz),Math.max(e.flash,fz,bfx*.9));
+    const bfx=e.buf?.14+.22*S.pulse:0, hlv=e.hl>0?(e.hl=Math.max(0,e.hl-dt*3.5)):0; e.body.emissive.setRGB(Math.max(e.flash,e.wind,fz,bfx,hlv*.2),Math.max(e.flash,fz,hlv*.8),Math.max(e.flash,fz,bfx*.9,hlv*.7));
     if(e.bs===3)e.body.emissive.setRGB(e.flash,Math.max(e.flash,.3),Math.max(e.flash,.5));
   }
   // separación
@@ -1504,7 +1522,7 @@ $('ttBtn').addEventListener('click',async()=>{
 function resetGame(){
   for(const e of dying)scene.remove(e.g); dying=[]; for(const e of enemies)scene.remove(e.g); enemies=[]; for(const p of projs)removeProj(p); projs=[]; for(const z of zones)scene.remove(z.m); zones=[]; for(const b of bombs)scene.remove(b.m); bombs.length=0; clearDrones(); for(const k of kits)scene.remove(k.g); kits=[]; if(holeM)holeM.visible=false; $('likeFill').style.transform='scaleX(0)';
   const c=CHARS[S.char];
-  Object.assign(S,{over:false,t:0,score:0,combo:0,comboT:0,maxCombo:0,kills:0,hp:c.hp,maxHp:c.hp,level:1,boost:0,minigunT:0,wcd:0,reload:null,shots:0,hits:0,rS:0,rH:0,killTime:4,killRate:0,diff:.3,shake:0,slowT:0,spawnT:1.5,perks:{},hurtT:0,likes:0,slowmo:1,acd:0,ult:0,inv:0,shield:0,ultFx:null,stuck:0,pitch:0,yaw:0,tension:0,peak:0,peakK:0,peakCd:5,punch:0,dutch:0,hitStop:0,dropSlow:0,bobT:0,freezeT:0,discoT:0,lookX:0,lookY:0,hole:null,kitT:0,medCd:8,up:newUp(),pick:false,pickQ:0,pickAt:0,prof:newProf(),tankE:null,linkT:0});
+  Object.assign(S,{over:false,t:0,score:0,combo:0,comboT:0,maxCombo:0,kills:0,hp:c.hp,maxHp:c.hp,level:1,boost:0,minigunT:0,wcd:0,reload:null,shots:0,hits:0,rS:0,rH:0,killTime:4,killRate:0,diff:.3,shake:0,slowT:0,spawnT:1.5,perks:{},hurtT:0,likes:0,slowmo:1,acd:0,ult:0,inv:0,shield:0,ultFx:null,stuck:0,pitch:0,yaw:0,tension:0,peak:0,peakK:0,peakCd:5,punch:0,dutch:0,hitStop:0,dropSlow:0,bobT:0,freezeT:0,discoT:0,lookX:0,lookY:0,hole:null,kitT:0,medCd:8,healCd:14,healSaid:0,up:newUp(),pick:false,pickQ:0,pickAt:0,prof:newProf(),tankE:null,linkT:0});
   $('up').classList.remove('on');
   P.x=0;P.z=8;P.vx=P.vz=0;P.speed=0;P.dash=null; WEAPONS.forEach((w,i)=>ammo[i]=w.mag); S.cur=-1; S.prev=1; selectWeapon(1,true); cross.classList.remove('rel'); lastHud={}; $('feed').innerHTML=''; A.beatN=0; A.drop=false; A.phase='intro'; setupChar();
 }
@@ -1610,7 +1628,7 @@ $('wsUrl').value=CFG.ws; $('wsBtn').addEventListener('click',wsConnect); syncTog
  ['!ump',()=>Live.chat('prueba','!ump')],['!escopeta',()=>Live.chat('prueba','!escopeta')],['!sniper',()=>Live.chat('prueba','!sniper')],['!granada',()=>Live.chat('prueba','!granada')],['!boss',()=>spawnMany('boss',SP.mult)],['!dragon',()=>spawnMany('dragon',SP.mult)],['!creeper',()=>Live.chat('prueba','!creeper')],['!lento',()=>Live.chat('prueba','!lento')],['!caos',()=>Live.chat('prueba','!caos')],['❤ Like ×50',()=>Live.like('prueba',50)]]
  .forEach(([n,f])=>{const b=document.createElement('button');b.className='sm';b.textContent=n;b.addEventListener('click',()=>{if(!S.running)return;f();});$('tests').appendChild(b);});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(S.running||S.paused)&&!S.pick)setPause(!S.paused);});
-window.NeonRush={prof:()=>S.prof,profThink,profTick,pickType,tankLink,tankE:()=>S.tankE,dir:updateDirector,cam:camera,aim,fire,openPick,pickCard,upRoll,hpMulAt,bossHpMul,abil,UPC,WUP,newUp,shoot,ammo,bossAttack,kits:()=>kits,dropKit,kill:killEnemy,event:Live.onEvent,Live,S,P,spawn:spawnEnemy,enemies:()=>enemies,startGame,useAbility,useUlt,CHARS,CFG,drones:()=>drones,fans,topFans,spawnDrone,A,PERF,QL,renderer,scene,setQL:i=>setQL(i),ql:()=>ql,fxMat};
+window.NeonRush={bossDmg,bossTempo,healWave,prof:()=>S.prof,profThink,profTick,pickType,tankLink,tankE:()=>S.tankE,dir:updateDirector,cam:camera,aim,fire,openPick,pickCard,upRoll,hpMulAt,bossHpMul,abil,UPC,WUP,newUp,shoot,ammo,bossAttack,kits:()=>kits,dropKit,kill:killEnemy,event:Live.onEvent,Live,S,P,spawn:spawnEnemy,enemies:()=>enemies,startGame,useAbility,useUlt,CHARS,CFG,drones:()=>drones,fans,topFans,spawnDrone,A,PERF,QL,renderer,scene,setQL:i=>setQL(i),ql:()=>ql,fxMat};
 addEventListener('resize',resize);
 
 /* ================= Rendimiento ================= */
