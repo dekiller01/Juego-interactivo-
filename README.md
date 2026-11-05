@@ -108,6 +108,26 @@ Perillas en el código (por si quieres tocarlas): `MAP_MIN` (confianza mínima p
 Límites: probado con canciones sintéticas de tempo conocido, no con música comercial real; no entiende bien tempos que cambian durante la
 canción ni intros sin percusión (para eso están ½×/2×, TAP y el respaldo en vivo).
 
+## Movimiento y flujo (v17, inspirado en Tachyon Flow)
+
+**Carrera por paredes y pilares**: si corres pegado a una pared del salón o a un pilar (a menos de ~1 m) avanzando a lo largo, entras en
+*carril*: +22 % de velocidad (que además late con cada latido de la música), chispas en la superficie y la cámara se inclina ~6° hacia fuera.
+Basta con empujar el joystick en diagonal contra la pared; no hay que saltar. Si te quedas quieto o te separas, sales del carril.
+
+**FLUJO** (barra junto a RITMO): de 0 a 100.
+- Sube: moviéndote (+4/s), en carril (+8/s extra y +2 por latido), disparando al latido (+2 por latido), esquivando al ritmo (+8) y con la esquiva perfecta (+25).
+- Baja: poco a poco (−2/s), quieto más de 0,7 s (−12/s) y −30 de golpe cuando te hacen daño.
+- Da hasta **+25 % de daño** y **+8 % de velocidad** al llegar a 100 («MÁX»). Es un bono moderado a propósito: premia moverse bien, no rompe el equilibrio.
+
+**ESQUIVA** (botón **ESQ**, encima de DISPARO; en teclado Shift o Q): salto corto de ~4 m con 0,3 s de invulnerabilidad y 1,5 s de enfriamiento.
+Sirve para todos los personajes (no sustituye a la habilidad de cada uno). Si lo haces *dentro de la ventana del latido*: invulnerabilidad 0,42 s,
+enfriamiento un 40 % menor y +8 de flujo («AL RITMO»).
+**ESQUIVA PERFECTA**: si un golpe te iba a alcanzar mientras eres invulnerable por esquivar (o por el DASH de Volt o el BLINK de Zero) no recibes daño y ganas:
+cámara lenta de 0,4 s para el mundo (tú vas a velocidad normal), +25 de flujo y **CONTRAATAQUE** (+30 % de daño 3 s). Se puede repetir cada 0,8 s como mínimo.
+El escudo de Titan no cuenta como esquiva perfecta.
+
+Perillas en el código: `FLOW_DMG` (.25), `FLOW_SPD` (.08), `RAIL_SPD` (.22), `RAIL_GAP` (1.15 m), `DODGE_CD` (1.5 s).
+
 ## Rendimiento
 
 ⚙ → **RENDIMIENTO** tiene tres modos:
