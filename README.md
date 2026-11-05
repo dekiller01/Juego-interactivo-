@@ -80,8 +80,33 @@ el botón ⏭ (arriba a la derecha) y el menú de pausa cambian de canción. Si 
 Usa música libre de derechos: la música comercial puede hacer que TikTok silencie o sancione el directo.
 
 **Anillo de latido**: un anillo se cierra sobre la mira y llega justo en el siguiente latido; ahí destella. Disparar en ese instante
-(~0,1 s) da el bono de daño al ritmo. Se redibuja solo en cada latido, así que no cuesta nada de rendimiento. Con canciones tuyas el latido
-se detecta sobre la marcha, por lo que puede adelantarse o atrasarse un poco; con la música del juego es casi exacto.
+da el bono de daño al ritmo. La ventana es de 0,11 s después del latido y 0,07 s antes (antes solo existía la de después), así que
+es más fácil acertar. Se redibuja solo en cada latido, así que no cuesta nada de rendimiento.
+
+### Mapa por canción (v16)
+Al añadir una canción, el juego la **analiza una sola vez** (en el menú, nunca durante la partida; unos segundos por canción) y guarda un
+mapa diminuto en el teléfono: tempo (BPM), desfase del primer latido, secciones por compás (intro, subida, fuerte, pausa) y los momentos
+de «caída». En la partida los latidos salen de ese mapa, calculados con el reloj del audio, en vez de adivinarse al oír la música. Así:
+- el latido y el anillo caen en el instante exacto, sin adelantos ni retrasos;
+- la fase (intro/subida/fuerte/pausa) y las caídas se conocen de antemano: aparece **¡PREPÁRATE!** unos 4 latidos antes de cada caída;
+- si el análisis no es fiable (confianza menor a 0,35: tempo que cambia, música sin percusión, etc.) o la canción no tiene mapa, el juego
+  vuelve solo a la detección en vivo de antes. En la lista cada canción muestra `128 BPM ✓` (mapa activo), `122 BPM ?` (poco fiable, no se usa),
+  `✎` (ajustado a mano) o `sin mapa`.
+
+En **🎵 MI MÚSICA → MAPA DE LA CANCIÓN** (toca el nombre de una canción para oírla; el punto de arriba late con el mapa):
+- **½× / 2× TEMPO**: si el análisis cogió el doble o la mitad del tempo.
+- **◀ −10 ms / +10 ms ▶**: mueve la rejilla si los latidos van un poco antes o después de lo que oyes.
+- **TAP**: toca al ritmo (mínimo 5 toques) y el mapa se rehace con ese tempo y fase. Compensa la latencia del audio.
+- **RE-ANALIZAR**: vuelve a analizar desde cero (borra tus ajustes a mano).
+- **EXPORTAR / IMPORTAR**: guarda el mapa como un archivo `.nbrmap.json` de unos 150 bytes (solo números: **nunca incluye la canción**) para
+  pasarlo a otro teléfono o hacer copia. Al importar se comprueba que la duración coincida (±2,5 s) con la canción elegida.
+- **SINCRONÍA** (también en el menú de ajustes, −250 a +400 ms): para audífonos Bluetooth u otros con retraso. El juego ya descuenta la latencia
+  que informa el navegador; este deslizador corrige el resto. Si ves el latido antes de oírlo, sube el valor; si lo oyes antes de verlo, bájalo.
+  Vale también para la música interna del juego.
+
+Perillas en el código (por si quieres tocarlas): `MAP_MIN` (confianza mínima para usar el mapa, 0,35).
+Límites: probado con canciones sintéticas de tempo conocido, no con música comercial real; no entiende bien tempos que cambian durante la
+canción ni intros sin percusión (para eso están ½×/2×, TAP y el respaldo en vivo).
 
 ## Rendimiento
 
