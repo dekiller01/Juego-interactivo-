@@ -128,6 +128,25 @@ El escudo de Titan no cuenta como esquiva perfecta.
 
 Perillas en el código: `FLOW_DMG` (.25), `FLOW_SPD` (.08), `RAIL_SPD` (.22), `RAIL_GAP` (1.15 m), `DODGE_CD` (1.5 s).
 
+## APK de Android (v18)
+
+La APK es el mismo juego dentro de una app (Capacitor): el juego va empaquetado en el teléfono (arranca al instante y se puede jugar sin internet),
+y para TikTok LIVE se conecta por WebSocket a tu servidor de Render, igual que en el navegador. Se compila en GitHub, sin ordenador.
+
+Archivos en la raíz del repositorio: `index.html`, `three.min.js`, `server.js` (con CORS para la app), `apk_prepare.py` y `.github/workflows/apk.yml`.
+
+**Compilar**: pestaña *Actions* → «Construir APK» → *Run workflow* (la dirección del servidor ya viene puesta). Tarda ~6-10 min. La APK queda en
+*Releases* (`NeonBeatRush.apk`); el enlace fijo es `https://github.com/<usuario>/<repositorio>/releases/latest/download/NeonBeatRush.apk`.
+
+**Firma (una sola vez)**: para que cada APK nueva se instale *encima* de la anterior sin perder tus canciones, crea dos *secrets* en
+*Settings → Secrets and variables → Actions*: `KEYSTORE_B64` (el texto largo de la clave) y `KEYSTORE_PASS` (su contraseña). Sin ellos la APK se firma con una
+clave de prueba que cambia en cada compilación (habría que desinstalar para actualizar). **Guarda la clave y su contraseña: si las pierdes no podrás actualizar la app.**
+No subas la clave al repositorio.
+
+**Qué cambia respecto a la web**: pantalla siempre encendida y a pantalla completa, siempre horizontal, icono neón. Las canciones y mapas son de la app
+(no se comparten con el navegador): hay que volver a añadir las canciones dentro de la app. «EXPORTAR» mapa abre el menú de compartir de Android.
+El botón atrás cierra la app. Cada cambio del juego (`index.html`) requiere compilar una APK nueva; el servidor se actualiza solo en Render.
+
 ## Rendimiento
 
 ⚙ → **RENDIMIENTO** tiene tres modos:

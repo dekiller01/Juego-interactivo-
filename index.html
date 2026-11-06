@@ -1602,6 +1602,11 @@ function clearAll(){for(const e of enemies){if(e.dead)continue;e.dead=true;e.die
   add('LIMPIAR',clearAll,true); const m=add('CANTIDAD ×1',()=>{SP.mult=SP.mults[(SP.mults.indexOf(SP.mult)+1)%SP.mults.length];m.textContent='CANTIDAD ×'+SP.mult;},true);
   $('spBtn').addEventListener('pointerdown',e=>e.stopPropagation()); $('spBtn').addEventListener('click',()=>box.classList.toggle('on'));
 })();
+/* En la APK el juego se carga desde dentro del teléfono; el compilador de la APK define window.NBR_SERVER con la dirección del servidor de Render. */
+const NBR_BASE=String(window.NBR_SERVER||'').replace(/\/+$/,'');
+let wlock=null;
+function wakeOn(){try{if(navigator.wakeLock&&!wlock)navigator.wakeLock.request('screen').then(l=>{wlock=l;l.addEventListener('release',()=>{wlock=null;});}).catch(()=>{});}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.running)wakeOn();});
 let ws=null,wsWant=false;
 function wsConnect(){
   const url=$('wsUrl').value.trim(); if(!url)return; CFG.ws=url; store.set('nbr.ws',url); wsWant=true; try{ws&&ws.close();}catch(e){}
@@ -1615,14 +1620,14 @@ function wsConnect(){
 
 async function tryAutoLive(){
   try{
-    const r=await fetch('/api/config',{cache:'no-store'}); if(!r.ok)return; const j=await r.json(); if(!j||!j.live)return;
-    $('wsUrl').value=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
+    const r=await fetch(NBR_BASE+'/api/config',{cache:'no-store'}); if(!r.ok)return; const j=await r.json(); if(!j||!j.live)return;
+    $('wsUrl').value=NBR_BASE?(NBR_BASE.replace(/^http/,'ws')+'/ws'):((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws');
     $('ttUser').value=j.tiktokUser?('@'+j.tiktokUser):''; $('ttKey').value=store.get('nbr.tkey',''); $('ttSt').textContent='Servidor propio detectado. Pon tu @usuario y la clave admin de Render.'; wsConnect();
   }catch(e){}
 }
 $('ttBtn').addEventListener('click',async()=>{
   const user=$('ttUser').value.trim(), key=$('ttKey').value.trim(); store.set('nbr.tkey',key); $('ttSt').textContent='Conectando…';
-  try{const r=await fetch('/api/tiktok',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user,key})});const j=await r.json();$('ttSt').textContent=j.ok?'Usuario guardado: @'+j.user:(j.error||'Error');}
+  try{const r=await fetch(NBR_BASE+'/api/tiktok',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user,key})});const j=await r.json();$('ttSt').textContent=j.ok?'Usuario guardado: @'+j.user:(j.error||'Error');}
   catch(e){$('ttSt').textContent='No se pudo contactar con el servidor.';}
 });
 /* ================= Flujo ================= */
@@ -1636,8 +1641,8 @@ function resetGame(){
 function startGame(){
   $('start').classList.add('hide'); $('over').classList.add('hide'); document.body.classList.add('play'); S.char=CFG.ch; resetGame();
   A.init(); if(A.ctx){A.ctx.resume();A.music.gain.value=CFG.mv*.7;A.sfx.gain.value=CFG.sv;if(A.useList&&A.list.length){A.setTrack(A.shuffle&&A.list.length>1?(Math.random()*A.list.length)|0:A.idx,false);A.startFile();}else{A.bpm=+$('bpm').value;A.startSynth();}}
-  try{const el=document.documentElement;const fs=el.requestFullscreen&&el.requestFullscreen();if(fs&&fs.then)fs.then(()=>screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape')).catch(()=>{});}catch(e){}
-  S.running=true; S.paused=false; banner('¡AL RITMO!','#19f0ff',CHARS[S.char].name);
+  try{const el=document.documentElement;const fs=!window.NBR_APP&&el.requestFullscreen&&el.requestFullscreen();if(fs&&fs.then)fs.then(()=>screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape')).catch(()=>{});}catch(e){}
+  S.running=true; S.paused=false; wakeOn(); banner('¡AL RITMO!','#19f0ff',CHARS[S.char].name);
 }
 function gameOver(){
   S.over=true; S.running=false; S.peak=0; aim.down=false; fire.down=false; A.stopAll(); const nb=S.score>S.best; if(nb){S.best=S.score;store.set('nbr.best',S.best);}
@@ -1863,9 +1868,16 @@ $('mapP').addEventListener('click',()=>mapEdit(m=>{const per=60/m.bpm;m.off=(((m
   $('mapSt').textContent='TAP: '+taps.length+' toques → '+m.bpm.toFixed(1)+' BPM (ajustado a mano)';
 });}
 $('mapRe').addEventListener('click',()=>{const t=mapCur();if(!t)return;try{localStorage.removeItem(mapKey(t));localStorage.removeItem(mapFailKey(t));}catch(e){}t.map=undefined;mapEnqueue(t,true);});
+function nativeShare(fname,json,title){
+  const C=window.Capacitor; if(!(window.NBR_APP&&C&&C.isNativePlatform&&C.isNativePlatform()&&C.registerPlugin))return false;
+  try{const FS=C.registerPlugin('Filesystem'),SH=C.registerPlugin('Share');
+    FS.writeFile({path:fname,data:json,directory:'CACHE',encoding:'utf8'}).then(r=>SH.share({title,url:r.uri,dialogTitle:'Guardar o enviar el mapa'})).then(()=>{$('mapSt').textContent='Mapa listo: elige dónde guardarlo o enviarlo.';}).catch(()=>{$('mapSt').textContent='No se pudo compartir el mapa.';});
+    return true;}catch(e){return false;}
+}
 $('mapExp').addEventListener('click',()=>{
   const t=mapCur(),m=t&&mapLoad(t); if(!m)return;
   const o={nbrmap:1,name:t.name,size:t.blob.size,bpm:m.bpm,off:m.off,dur:m.dur,conf:m.conf,ph:m.ph,dr:m.dr};
+  if(nativeShare(trackName(t.name).replace(/[^\w\- ]+/g,'_').slice(0,60)+'.nbrmap.json',JSON.stringify(o),'Mapa de Neon Beat Rush'))return;
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'})); a.download=trackName(t.name).replace(/[^\w\- ]+/g,'_').slice(0,60)+'.nbrmap.json';
   document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500); $('mapSt').textContent='Mapa exportado (solo números, sin la canción).';
 });
