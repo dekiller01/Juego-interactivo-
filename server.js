@@ -16,6 +16,15 @@ let tiktokUser = cleanUser(process.env.TIKTOK_USER);
 
 const app = express();
 app.use(express.json({ limit: '10kb' }));
+// La app Android (Capacitor) carga el juego desde https://localhost y llama a esta API desde otro origen:
+// solo ese origen (y el de iOS) puede hacerlo; el resto de sitios sigue bloqueado por el navegador.
+const APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost']);
+app.use('/api', (req, res, next) => {
+  const o = req.headers.origin;
+  if (o && APP_ORIGINS.has(o)) res.set({ 'Access-Control-Allow-Origin': o, 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Max-Age': '600' });
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 // Estructura plana: solo se publican estos dos archivos (no el código del servidor)
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/index.html', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));

@@ -1,0 +1,106 @@
+name: Construir APK
+
+# Se ejecuta a mano: pestaña Actions > "Construir APK" > Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      servidor:
+        description: 'Direccion de tu servidor en Render (sin barra final)'
+        required: true
+        default: 'https://juego-interactivo-0665.onrender.com'
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    name: Compilar la APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SERVIDOR: ${{ github.event.inputs.servidor }}
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v6
+
+      - name: Instalar Node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Instalar Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Preparar el proyecto de Capacitor
+        run: |
+          set -e
+          (sudo apt-get install -y -qq python3-pil || python3 -m pip install --break-system-packages pillow) > /dev/null 2>&1 || true
+          mkdir apk
+          cd apk
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund @capacitor/core@8.6.0 @capacitor/cli@8.6.0 @capacitor/android@8.6.0 @capacitor/share@8.0.3 @capacitor/filesystem@8.1.5
+          python3 ../apk_prepare.py web --src .. --out . --server "$SERVIDOR"
+          npx cap add android
+          python3 ../apk_prepare.py android --out . --code "${{ github.run_number }}" --name "1.0.${{ github.run_number }}"
+          npx cap sync android
+
+      - name: Preparar la clave de firma
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASS }}
+        run: |
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ]; then
+            printf '%s' "$KS_B64" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/nbr.p12"
+            keytool -list -keystore "$RUNNER_TEMP/nbr.p12" -storetype pkcs12 -storepass "$KS_PASS" -alias nbr > /dev/null 2>&1 || { echo "::error::La clave de firma (KEYSTORE_B64) o su contrasena (KEYSTORE_PASS) no son validas. Revisa los dos secretos."; exit 1; }
+            echo "NBR_KS=$RUNNER_TEMP/nbr.p12" >> "$GITHUB_ENV"
+            echo "NBR_KS_PASS=$KS_PASS" >> "$GITHUB_ENV"
+            echo "TAREA=assembleRelease" >> "$GITHUB_ENV"
+            echo "APK_RUTA=apk/android/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_ENV"
+            echo "FIRMA=firmada con tu clave fija: se instala encima de la anterior sin perder tus canciones" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No hay secretos KEYSTORE_B64 y KEYSTORE_PASS: se firma con una clave de prueba y la proxima APK no se podra instalar encima de esta (habria que desinstalar y perder tus canciones)."
+            echo "TAREA=assembleDebug" >> "$GITHUB_ENV"
+            echo "APK_RUTA=apk/android/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
+            echo "FIRMA=firmada con clave de prueba (para actualizar tendras que desinstalar antes)" >> "$GITHUB_ENV"
+          fi
+
+      - name: Aceptar las licencias de Android
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+
+      - name: Compilar la APK
+        working-directory: apk/android
+        run: |
+          chmod +x gradlew
+          ./gradlew "$TAREA" --no-daemon --stacktrace
+
+      - name: Dejar la APK lista
+        run: |
+          mkdir salida
+          cp "$APK_RUTA" salida/NeonBeatRush.apk
+          ls -l salida
+
+      - name: Guardar la APK como archivo de la ejecucion
+        uses: actions/upload-artifact@v6
+        with:
+          name: NeonBeatRush-APK
+          path: salida/NeonBeatRush.apk
+          retention-days: 14
+
+      - name: Publicar en Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "apk-${{ github.run_number }}" salida/NeonBeatRush.apk \
+            --target "$GITHUB_SHA" \
+            --title "Neon Beat Rush - APK #${{ github.run_number }}" \
+            --notes "Servidor: $SERVIDOR. APK $FIRMA." \
+            --latest
+          {
+            echo "### APK lista"
+            echo "Descargala en: https://github.com/${{ github.repository }}/releases/latest"
+            echo "Servidor de TikTok/multijugador: $SERVIDOR"
+            echo "APK $FIRMA"
+          } >> "$GITHUB_STEP_SUMMARY"
