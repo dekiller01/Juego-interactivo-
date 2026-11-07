@@ -190,6 +190,7 @@ Los efectos de pantalla (golpe, vida baja, escudo, velocidad) ahora se dibujan e
 - El jefe ya no se queda parado en el centro: persigue (sin frenarse cuando le disparas), rodea los pilares y, al ritmo de la música, alterna **¡SALTO!**
   (marca una zona rosa donde estás y cae encima), **¡EMBESTIDA!**, **¡RÁFAGA!**, **¡ONDA DE FUEGO!** y **¡REFUERZOS!**. Tras saltar o embestir queda
   **¡ABIERTO!** ~1,5 s (azulado, +50 % de daño). Con menos de la mitad de vida se enfurece.
+- **Dragones y fénix (v19)**: +37 % de vida base (`DRAGON_HP = 1.37`: DRAGÓN 300 → 411, FÉNIX 260 → 356 antes del escalado por nivel). El resto de enemigos y el jefe no cambian.
 - **El jefe es el tanque**: mientras haya un jefe vivo, el **95 % del daño de tus balas contra cualquier mob (pequeños, dragones y fénix) pasa al jefe**
   (el mob solo recibe el 5 %; sale un rayo magenta del mob al jefe) y los mobs pequeños van **+20 % más rápidos y pegan +25 % más** (brillan en magenta
   al ritmo). Así que hay que matar al jefe primero, y ningún disparo se pierde porque todos le llegan. No afecta al médico (el tuyo), al sanador
@@ -204,6 +205,53 @@ Los efectos de pantalla (golpe, vida baja, escudo, velocidad) ahora se dibujan e
   el nivel 3 y llega al máximo en el nivel 12. Avisa **una sola vez** ("LOS ENEMIGOS APRENDEN", sin decir a qué) la primera vez que se juega.
   Desde el nivel 125 el tope sube +0,4 % por nivel hasta el **75 %** (nivel 175). Si cambias de arma o de estilo, se adaptan de nuevo.
   Cuesta microsegundos y 0 dibujos extra. Tope en `LEARN_MAX`.
+
+## Perfiles, datos de partida y ranking (v20)
+
+**Perfil sin correo ni contraseña.** En el menú, **👤 PERFIL** → eliges un apodo (3 a 16 letras, números, espacio, `_`, `.` o `-`) y el juego crea tu
+perfil. Te da un **código de recuperación** (`XXXX-XXXX-XXXX`): con tu apodo y ese código entras desde otro teléfono o desde la app. Guárdalo
+(captura de pantalla o notas); quien lo tenga puede entrar a tu perfil. Desde el perfil también puedes cambiar el apodo, pedir un código nuevo
+(el viejo deja de servir), cerrar sesión o **borrar tu perfil y todas tus partidas** del servidor. Jugar sin perfil sigue siendo posible: no se envía nada.
+
+**Qué se guarda de cada partida** (solo si tienes perfil, partidas de más de 20 s): puntaje, bajas, nivel, duración, personaje, tiempo/disparos/precisión/
+daño por impacto/distancia del impacto/críticos/bajas **por arma**, disparos y esquivas **al ritmo**, bajas por tipo de enemigo, mejoras elegidas,
+tiempo que tardaste en cada nivel, daño recibido, metros recorridos, causa de la muerte, FPS (medio, mínimo, segundos bajo 30) y nivel de calidad,
+BPM y si había mapa de ritmo, y el modelo de gráfica del teléfono (por ejemplo «Adreno 619») para saber qué dispositivos van justos.
+**No se guarda** nombre real, correo, ubicación ni la IP. El juego avisa de todo esto al crear el perfil.
+
+**Ranking**: botón **🏆 RANKING** (y al terminar cada partida). Pestañas PUNTAJE (mejor partida: bajas × combo) o BAJAS (suma), y 24 H / SEMANA / SIEMPRE. Sales
+resaltado aunque no estés en el top. Si no hay conexión (o el servidor está despertando), la partida se guarda en el teléfono y se envía sola después.
+
+**Anti-trampas (nivel amigos/hobby).** El puntaje lo manda el teléfono, así que alguien con ganas podría falsearlo. El servidor descarta las partidas
+imposibles (bajas o puntos por segundo absurdos, nivel que no cuadra con las bajas, bajas por arma que no suman) y esas **no cuentan** para el ranking ni
+para los récords. Si un jugador hace trampa de forma más fina, lo ocultas desde el panel. Límites: 6 perfiles nuevos por hora y por IP, 5 intentos de
+recuperación fallidos y se bloquea un rato, una partida cada pocos segundos como mucho. Hay un filtro básico de apodos (palabras ofensivas y nombres como «admin»).
+
+### Base de datos (para que el ranking no se borre)
+
+Sin base de datos externa el servidor guarda todo en un archivo, **pero en el plan gratis de Render el disco se borra al reiniciar o actualizar**.
+Para que sea permanente:
+
+1. Entra en **neon.tech** y crea una cuenta gratis (no pide tarjeta). Crea un proyecto (nombre `neon-beat-rush`; elige una región cercana a tu servidor de Render).
+2. En el panel del proyecto toca **Connect** y copia la **cadena de conexión** (empieza por `postgresql://`). Vale la versión normal o la «pooled».
+3. En **Render** → tu servicio → **Environment** → **Add Environment Variable**: nombre `DATABASE_URL`, valor = la cadena copiada → **Save**. Render reinicia solo.
+4. Abre `https://TU-SERVIDOR.onrender.com/admin/panel?key=TU_ADMIN_KEY` (la `ADMIN_KEY` está en Render → Environment). En «Estado» debe decir
+   **PostgreSQL ✔ permanente**. Las tablas se crean solas; no hay que escribir SQL.
+
+Supabase u otro Postgres también sirven (misma variable). Opcionales: `DATABASE_SSL=strict` (verifica el certificado; Neon lo permite) o `DATABASE_SSL=off`,
+y `DATA_DIR` para cambiar dónde va el archivo cuando no hay base. Neon gratis se «duerme» tras unos minutos sin uso: la primera partida tras un rato
+puede tardar un segundo más en guardarse; no se pierde nada. Las partidas completas se guardan 180 días; los récords y totales de cada jugador, siempre.
+
+### Panel del dueño (`/admin/panel?key=…`)
+
+Pensado para verse en el teléfono: estado del almacenamiento, **rendimiento por dispositivo** (FPS medio, % del tiempo bajo 30 FPS y calidad media por
+gráfica: si un modelo pasa del 15 % bajo 30 FPS hay que bajarle la carga), **armas** (uso, disparos, precisión, % al ritmo, daño por impacto, críticos, distancia,
+bajas), **niveles** (cuántos llegan a cada uno y cuánto tardan en superarlo), bajas por enemigo, **cómo terminan las partidas**, ritmo y esquivas (con mapa vs.
+detección en vivo), mejoras elegidas, personajes y la lista de jugadores con **Ocultar/Mostrar/Borrar**. Periodo 1, 7 o 30 días. **Descargar partidas (JSON)**
+saca todas las partidas sin tokens ni códigos, por si quieres analizarlas aparte. Una captura del panel es la forma más fácil de enseñármelo para afinar el juego.
+
+APIs (por si las necesitas): `POST /api/p/registro|recuperar|apodo|codigo|salir|borrar|partida`, `GET /api/p/yo`, `GET /api/p/ranking?por=score|kills&per=day|week|all&n=20`.
+La app Android usa las mismas (el servidor ya acepta su origen). **Hace falta volver a ejecutar «Construir APK»** para que la app traiga el perfil y el ranking.
 
 ## Cómo seguir añadiendo cosas sin que se ponga pesado
 

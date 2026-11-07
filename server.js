@@ -4,6 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { montarPerfiles } from './perfiles.js';
 import { WebSocketServer } from 'ws';
 import { TikTokLiveConnection, WebcastEvent, ControlEvent } from 'tiktok-live-connector';
 
@@ -21,7 +22,7 @@ app.use(express.json({ limit: '10kb' }));
 const APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost']);
 app.use('/api', (req, res, next) => {
   const o = req.headers.origin;
-  if (o && APP_ORIGINS.has(o)) res.set({ 'Access-Control-Allow-Origin': o, 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Max-Age': '600' });
+  if (o && APP_ORIGINS.has(o)) res.set({ 'Access-Control-Allow-Origin': o, 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Max-Age': '600' });
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
@@ -51,9 +52,10 @@ setInterval(() => {
 
 /* ---------- API ---------- */
 app.get('/health', (_req, res) => res.type('text').send('ok'));
-app.get('/api/config', (_req, res) => res.json({ live: true, tiktokUser: tiktokUser || null }));
+app.get('/api/config', (_req, res) => res.json({ live: true, perfiles: true, tiktokUser: tiktokUser || null }));
 app.get('/api/status', (_req, res) => res.json({ clients: wss.clients.size, ...status }));
 const keyOk = k => { if (!ADMIN_KEY || typeof k !== 'string') return false; const a = Buffer.from(k), b = Buffer.from(ADMIN_KEY); return a.length === b.length && crypto.timingSafeEqual(a, b); };
+montarPerfiles(app, { keyOk });   // perfiles, partidas y ranking (v20)
 app.post('/api/tiktok', (req, res) => {
   if (!ADMIN_KEY) return res.status(403).json({ ok: false, error: 'Falta ADMIN_KEY en el servidor' });
   if (!keyOk(req.body?.key)) return res.status(401).json({ ok: false, error: 'Clave incorrecta' });
