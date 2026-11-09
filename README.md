@@ -7,6 +7,7 @@ Shooter 3D en primera persona que corre en el navegador, con música reactiva y 
 
 - `index.html` y `three.min.js`: el juego completo (Three.js incluido).
 - `server.js`: sirve el juego y reenvía los eventos de TikTok al juego por WebSocket (`/ws`).
+- `salas.js`: salas del multijugador (v22); el servidor solo reparte mensajes entre los jugadores por WebSocket (`/mp`).
 - `render.yaml`: configuración para desplegar en Render con un toque.
 - `build_public.py`: regenera `index.html` a partir del fragmento que edita Claude.
 
@@ -242,6 +243,19 @@ Supabase u otro Postgres también sirven (misma variable). Opcionales: `DATABASE
 y `DATA_DIR` para cambiar dónde va el archivo cuando no hay base. Neon gratis se «duerme» tras unos minutos sin uso: la primera partida tras un rato
 puede tardar un segundo más en guardarse; no se pierde nada. Las partidas completas se guardan 180 días; los récords y totales de cada jugador, siempre.
 
+### Calidad gráfica inicial según el teléfono (v21)
+
+El juego ya recordaba el nivel de calidad de **cada teléfono** después de jugar un rato. Lo nuevo: cuando un teléfono **nunca ha jugado** (instalación nueva,
+otro navegador, la app), el juego le pregunta al servidor con qué nivel les va mejor a los demás **con la misma gráfica** (por ejemplo «Adreno 619») y arranca
+ahí, en vez de empezar en el nivel 1 y bajar a tirones durante los primeros segundos.
+
+- Se calcula con las partidas en modo **AUTO**: se mira en qué nivel pasó el tiempo cada teléfono (mediana por segundos). 0 es la calidad más alta y 4 la más baja; el inicio nunca pasa de 3.
+- Solo recomienda con datos suficientes: **3 partidas, 5 minutos y 2 jugadores distintos** con esa gráfica. Si no, no cambia nada y el juego se ajusta solo, como antes.
+- No toca nada si el teléfono ya tiene su nivel guardado, si elegiste AHORRO o MÁXIMO a mano, si hay una partida en curso o si el servidor no responde. Pregunta como mucho una vez cada 6 horas.
+- No necesita perfil: la pregunta no lleva datos personales, solo el modelo de gráfica. Las partidas sospechosas y las manuales no cuentan.
+- En el panel, la tabla de rendimiento tiene una columna **Inicio** con lo que se recomendaría a un teléfono nuevo con esa gráfica («–» si aún no hay datos suficientes).
+- Cada partida guarda ahora los **segundos que pasó en cada nivel de calidad** (campo `qh`).
+
 ### Panel del dueño (`/admin/panel?key=…`)
 
 Pensado para verse en el teléfono: estado del almacenamiento, **rendimiento por dispositivo** (FPS medio, % del tiempo bajo 30 FPS y calidad media por
@@ -252,6 +266,23 @@ saca todas las partidas sin tokens ni códigos, por si quieres analizarlas apart
 
 APIs (por si las necesitas): `POST /api/p/registro|recuperar|apodo|codigo|salir|borrar|partida`, `GET /api/p/yo`, `GET /api/p/ranking?por=score|kills&per=day|week|all&n=20`.
 La app Android usa las mismas (el servidor ya acepta su origen). **Hace falta volver a ejecutar «Construir APK»** para que la app traiga el perfil y el ranking.
+
+## Multijugador cooperativo (v22)
+
+Hasta **4 jugadores** en la misma arena, contra los mismos enemigos. Se entra desde el menú con **👥 MULTIJUGADOR**.
+
+- **Crear sala:** el anfitrión pone su apodo y pulsa CREAR SALA. Sale un código de 4 letras y un enlace (`…/?sala=ABCD`) que se comparte con el botón COMPARTIR ENLACE. Quien abre el enlace ya llega a la pantalla de la sala con el código puesto; solo pone su apodo y pulsa UNIRME. También se puede escribir el código a mano.
+- **Empezar:** solo el anfitrión ve EMPEZAR. Puedes empezar solo, para probar. Con la partida en marcha no entra nadie más (se espera a la siguiente).
+- **Cómo funciona:** el teléfono del **anfitrión** corre toda la partida (enemigos, jefes, niveles, música). Los demás ven lo que ocurre (10 veces por segundo), se mueven y disparan en su teléfono y le mandan al anfitrión sus golpes. El servidor no ejecuta el juego, solo reparte mensajes, así que consume muy poco. **Si el anfitrión se sale, la partida termina para todos** (todavía no hay cambio de anfitrión).
+- **Vida individual:** cada uno tiene su propia vida y sus propias mejoras. Los enemigos persiguen **al jugador vivo más cercano**, y las explosiones, el fuego y los proyectiles hieren a cualquiera que esté dentro. Hay más enemigos y con algo más de vida según cuántos jugáis (+40 % de vida y +50 % de enemigos por cada jugador extra, con tope de 40 a la vez).
+- **Caer y reanimar:** al quedarte sin vida no pierdes: quedas **caído** y un compañero vivo que se quede a menos de 3 m te reanima en unos 2,5 s (vuelves con la mitad de vida y 2,5 s de protección). La partida termina cuando **todos** han caído y se ve un marcador del equipo.
+- **Mejoras:** al subir de nivel (el nivel es del equipo, por bajas totales) cada uno elige su mejora **sin pausar la partida**: mientras eliges no te pueden herir.
+- **Música:** v22 manda a todos **el ritmo del anfitrión** (pulso, golpe de bombo y avisos de caída); la canción completa sincronizada llega en la siguiente versión.
+- **No cuenta para el ranking de solitario:** las partidas multijugador no se guardan en el perfil ni en el ranking, ni tocan tu récord.
+- **Seguridad:** el servidor limita mensajes por segundo, tamaño, salas por IP y solo acepta conexiones desde el propio sitio y la app. Los apodos se limpian de símbolos raros.
+- **Límites conocidos:** las habilidades que afectan a todos los enemigos a la vez (tiempo lento, vacío, congelar) solo los afectan en el teléfono del anfitrión; los demás ven sus golpes, pero el empuje no se comparte. El anfitrión necesita un teléfono medianamente bueno (corre todo). Si la conexión de un invitado se corta más de 9 s, su partida termina.
+- **App Android:** hace falta volver a ejecutar «Construir APK» para que la app traiga el multijugador. La app usa el mismo servidor, así que debería poder entrar a las mismas salas que la web (no se ha probado todavía en un teléfono real).
+- `GET /api/status` muestra cuántas salas y jugadores hay ahora mismo (`multijugador`).
 
 ## Cómo seguir añadiendo cosas sin que se ponga pesado
 

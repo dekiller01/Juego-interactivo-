@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { montarPerfiles } from './perfiles.js';
+import { montarSalas } from './salas.js';
 import { WebSocketServer } from 'ws';
 import { TikTokLiveConnection, WebcastEvent, ControlEvent } from 'tiktok-live-connector';
 
@@ -32,7 +33,14 @@ app.get('/index.html', (_req, res) => res.sendFile(path.join(__dirname, 'index.h
 app.get('/three.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=86400').sendFile(path.join(__dirname, 'three.min.js')));
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
+const salas = montarSalas();   // multijugador (v22): salas de hasta 4 jugadores en /mp
+server.on('upgrade', (req, socket, head) => {
+  let ruta = ''; try { ruta = new URL(req.url, 'http://x').pathname; } catch {}
+  if (ruta === '/ws') wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+  else if (ruta === '/mp') salas.upgrade(req, socket, head);
+  else socket.destroy();
+});
 
 /* ---------- estado y difusión ---------- */
 const status = { tiktok: 'idle', user: tiktokUser || null, detail: '' };
@@ -52,8 +60,8 @@ setInterval(() => {
 
 /* ---------- API ---------- */
 app.get('/health', (_req, res) => res.type('text').send('ok'));
-app.get('/api/config', (_req, res) => res.json({ live: true, perfiles: true, tiktokUser: tiktokUser || null }));
-app.get('/api/status', (_req, res) => res.json({ clients: wss.clients.size, ...status }));
+app.get('/api/config', (_req, res) => res.json({ live: true, perfiles: true, multi: true, tiktokUser: tiktokUser || null }));
+app.get('/api/status', (_req, res) => res.json({ clients: wss.clients.size, ...status, multijugador: salas.estado() }));
 const keyOk = k => { if (!ADMIN_KEY || typeof k !== 'string') return false; const a = Buffer.from(k), b = Buffer.from(ADMIN_KEY); return a.length === b.length && crypto.timingSafeEqual(a, b); };
 montarPerfiles(app, { keyOk });   // perfiles, partidas y ranking (v20)
 app.post('/api/tiktok', (req, res) => {
