@@ -30,7 +30,7 @@ export function montarSalas() {
     return null;
   };
   const enviar = (ws, obj) => { if (ws.readyState === 1) { try { ws.send(typeof obj === 'string' ? obj : JSON.stringify(obj)); } catch {} } };
-  const lista = s => ({ t: 'lista', code: s.code, host: s.host, fase: s.fase, jug: [...s.jug.values()].map(j => ({ id: j.id, n: j.nick })) });
+  const lista = s => ({ t: 'lista', code: s.code, host: s.host, fase: s.fase, modo: s.modo, jug: [...s.jug.values()].map(j => ({ id: j.id, n: j.nick })) });
   const difundir = (s, obj, salvo) => { const txt = JSON.stringify(obj); for (const j of s.jug.values()) if (j !== salvo) enviar(j.ws, txt); };
   function cerrarSala(s, motivo) {
     if (!salas.has(s.code)) return; salas.delete(s.code);
@@ -64,7 +64,7 @@ export function montarSalas() {
       if (salas.size >= MAX_SALAS) return enviar(ws, { t: 'err', e: 'servidor_lleno' });
       const code = codigoNuevo(); if (!code) return enviar(ws, { t: 'err', e: 'servidor_lleno' });
       lst.push(ahora); creadas.set(ip, lst);
-      const sala = { code, host: 1, fase: 'lobby', jug: new Map(), sig: 2, act: ahora, seed: 0 };
+      const sala = { code, host: 1, fase: 'lobby', modo: 'coop', jug: new Map(), sig: 2, act: ahora, seed: 0 };
       const yo = { id: 1, nick: nickLimpio(m.nick), ws }; sala.jug.set(1, yo); salas.set(code, sala); ws.sala = sala; ws.jid = 1;
       return enviar(ws, { ...lista(sala), t: 'sala', yo: 1 });
     }
@@ -84,9 +84,12 @@ export function montarSalas() {
     if (!s) return;
     const yo = s.jug.get(ws.jid); if (!yo) return; s.act = Date.now();
     if (t === 'salir') return quitar(ws);
+    if (t === 'modo' && yo.id === s.host && s.fase === 'lobby') {   // v24: el anfitrión elige en equipo o todos contra todos
+      s.modo = m.m === 'pvp' ? 'pvp' : 'coop'; return difundir(s, lista(s));
+    }
     if (t === 'empezar' && yo.id === s.host && s.fase === 'lobby') {
       s.fase = 'juego'; s.seed = crypto.randomInt(1, 2 ** 30);
-      return difundir(s, { t: 'empezar', seed: s.seed, ids: [...s.jug.keys()], n: [...s.jug.values()].map(j => j.nick), at: Date.now() });
+      return difundir(s, { t: 'empezar', modo: s.modo, seed: s.seed, ids: [...s.jug.keys()], n: [...s.jug.values()].map(j => j.nick), at: Date.now() });
     }
     if (t === 'fin' && yo.id === s.host && s.fase === 'juego') { s.fase = 'lobby'; return difundir(s, lista(s)); }
   }

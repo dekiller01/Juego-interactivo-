@@ -7,7 +7,7 @@ Shooter 3D en primera persona que corre en el navegador, con música reactiva y 
 
 - `index.html` y `three.min.js`: el juego completo (Three.js incluido).
 - `server.js`: sirve el juego y reenvía los eventos de TikTok al juego por WebSocket (`/ws`).
-- `salas.js`: salas del multijugador (v22); el servidor solo reparte mensajes entre los jugadores por WebSocket (`/mp`).
+- `salas.js`: salas del multijugador (v22; v24 añade el modo de la sala); el servidor solo reparte mensajes entre los jugadores por WebSocket (`/mp`).
 - `render.yaml`: configuración para desplegar en Render con un toque.
 - `build_public.py`: regenera `index.html` a partir del fragmento que edita Claude.
 
@@ -267,9 +267,9 @@ saca todas las partidas sin tokens ni códigos, por si quieres analizarlas apart
 APIs (por si las necesitas): `POST /api/p/registro|recuperar|apodo|codigo|salir|borrar|partida`, `GET /api/p/yo`, `GET /api/p/ranking?por=score|kills&per=day|week|all&n=20`.
 La app Android usa las mismas (el servidor ya acepta su origen). **Hace falta volver a ejecutar «Construir APK»** para que la app traiga el perfil y el ranking.
 
-## Multijugador cooperativo (v22)
+## Multijugador: en equipo y todos contra todos (v22 · v23 · v24)
 
-Hasta **4 jugadores** en la misma arena, contra los mismos enemigos. Se entra desde el menú con **👥 MULTIJUGADOR**.
+Hasta **4 jugadores** en la misma arena: en equipo contra los mismos enemigos, o todos contra todos. Se entra desde el menú con **👥 MULTIJUGADOR**.
 
 - **Crear sala:** el anfitrión pone su apodo y pulsa CREAR SALA. Sale un código de 4 letras y un enlace (`…/?sala=ABCD`) que se comparte con el botón COMPARTIR ENLACE. Quien abre el enlace ya llega a la pantalla de la sala con el código puesto; solo pone su apodo y pulsa UNIRME. También se puede escribir el código a mano.
 - **Empezar:** solo el anfitrión ve EMPEZAR. Puedes empezar solo, para probar. Con la partida en marcha no entra nadie más (se espera a la siguiente).
@@ -277,7 +277,11 @@ Hasta **4 jugadores** en la misma arena, contra los mismos enemigos. Se entra de
 - **Vida individual:** cada uno tiene su propia vida y sus propias mejoras. Los enemigos persiguen **al jugador vivo más cercano**, y las explosiones, el fuego y los proyectiles hieren a cualquiera que esté dentro. Hay más enemigos y con algo más de vida según cuántos jugáis (+40 % de vida y +50 % de enemigos por cada jugador extra, con tope de 40 a la vez).
 - **Caer y reanimar:** al quedarte sin vida no pierdes: quedas **caído** y un compañero vivo que se quede a menos de 3 m te reanima en unos 2,5 s (vuelves con la mitad de vida y 2,5 s de protección). La partida termina cuando **todos** han caído y se ve un marcador del equipo.
 - **Mejoras:** al subir de nivel (el nivel es del equipo, por bajas totales) cada uno elige su mejora **sin pausar la partida**: mientras eliges no te pueden herir.
-- **Música:** v22 manda a todos **el ritmo del anfitrión** (pulso, golpe de bombo y avisos de caída); la canción completa sincronizada llega en la siguiente versión.
+- **Música propia y ritmo independiente (v24):** cada jugador oye **su propia música** (su archivo, el mapa de ritmo de su canción o el sintetizador con sus BPM) y el **bono de ritmo es suyo**: disparar al compás de *tu* canción da tu bonus, aunque los demás vayan con otra. No hace falta tener el mismo archivo. Lo que sí es común de toda la partida: los enemigos, los jefes, los niveles y su dificultad, que los marca el teléfono del anfitrión (con *su* música); los invitados sienten además sus propios latidos (pulso, anillos, avisos de caída), pero esos latidos no hacen aparecer ni mover enemigos. Sustituye a la sincronía de canción de la v23.
+- **Modo de la sala (v24):** el anfitrión elige en la sala **🤝 EN EQUIPO** o **⚔ TODOS CONTRA TODOS** (los demás ven cuál está elegido, pero solo él lo cambia).
+- **Todos contra todos (v24):** partida de **5 minutos** en la misma arena, con los monstruos todavía presentes. Ahora **tus disparos también aciertan a los demás jugadores** (cuerpo y cabeza ×1,35, con crítico, bonus de ritmo, mejoras y armas como siempre) pero con el **30 % del daño** que le harías a un monstruo, para que no sea una carnicería de dos segundos. Cada jugador sale en un punto distinto del salón. Si alguien te queda sin vida, **eliminas a un jugador**: ganas **+300 puntos** (si diste el último golpe en los 8 s anteriores) y sale el aviso «Ana eliminó a Beto». El eliminado **reaparece solo a los 3,5 s** en un punto lejos de los demás, con la vida llena y 2,5 s de protección; mientras dura esa protección no se le puede dañar. Arriba aparece el reloj y tus eliminados (⚔); en la lista de la izquierda, los de cada rival. **Gana quien tenga más puntos** (monstruos + eliminaciones) cuando se acaba el tiempo; en la pantalla final cada fila lleva sus eliminados, muertes y daño. En este modo no hay reanimar compañeros y la dificultad no sube por jugador extra.
+- **Marcador de equipo (v23):** al terminar sale cada jugador con puntaje y bajas, y debajo su **daño**, **reanimaciones** y **mejor combo**; arriba el resumen del equipo (bajas totales y tiempo) y un 🏆 para quien más puntos hizo. El daño de los compañeros lo cuenta el anfitrión con los golpes que le llegan.
+- **Arranque más suave (v23):** el anfitrión empieza con la calidad gráfica un poco más baja (nivel 2) cuando está en AUTO, y sube sola si el teléfono va sobrado. Así se evitan los tirones de los primeros segundos mientras el juego se ajusta.
 - **No cuenta para el ranking de solitario:** las partidas multijugador no se guardan en el perfil ni en el ranking, ni tocan tu récord.
 - **Seguridad:** el servidor limita mensajes por segundo, tamaño, salas por IP y solo acepta conexiones desde el propio sitio y la app. Los apodos se limpian de símbolos raros.
 - **Límites conocidos:** las habilidades que afectan a todos los enemigos a la vez (tiempo lento, vacío, congelar) solo los afectan en el teléfono del anfitrión; los demás ven sus golpes, pero el empuje no se comparte. El anfitrión necesita un teléfono medianamente bueno (corre todo). Si la conexión de un invitado se corta más de 9 s, su partida termina.
