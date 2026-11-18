@@ -69,10 +69,11 @@ function validar(b) {
   const mid = String(b.mid || ''); if (!/^[a-z0-9]{8,24}$/i.test(mid)) return { error: 'Identificador de partida no válido.' };
   const dur = r1(num(b.dur, 0, 36000)), kills = ent(b.kills, 0, 1e6), score = ent(b.score, 0, 2e9), level = ent(b.level, 1, 999);
   if (dur < 20 || kills < 1) return { skip: true };           // partidas de menos de 20 s o sin bajas no se guardan
+  const mp = b.mp ? 1 : 0;   // v25: partida multijugador (cuenta para el ranking de BAJAS, no para el de puntaje ni el récord)
   const w = Array.from({ length: 5 }, (_, i) => { const a = Array.isArray(b.w?.[i]) ? b.w[i] : []; return Array.from({ length: 9 }, (_, j) => r1(num(a[j], 0, 1e9))); });
   const f = b.fps || {}, d = b.dev || {};
   const data = {
-    sv: 1, cv: ent(b.v, 0, 999), ch: texto(b.ch, 12).toLowerCase(), mc: ent(b.mc, 0, 1e5), w,
+    sv: 1, cv: ent(b.v, 0, 999), ch: texto(b.ch, 12).toLowerCase(), mc: ent(b.mc, 0, 1e5), w, mp, pvp: mp && b.pvp ? 1 : 0, np: mp ? ent(b.np, 1, 4) : 0,
     kt: claves(b.kt, /^[a-z0-9_]{2,16}$/i, 30, 1e6), up: claves(b.up, /^[a-z0-9_]{1,16}$/i, 40, 500),
     lv: Array.isArray(b.lv) ? b.lv.slice(0, 300).map(x => ent(x, 0, 36000)) : [],
     hit: ent(b.hit, 0, 1e7), dist: ent(b.dist, 0, 1e7), dg: ent(b.dg, 0, 1e5), dgb: ent(b.dgb, 0, 1e5), pd: ent(b.pd, 0, 1e5),
@@ -80,13 +81,14 @@ function validar(b) {
     death: texto(b.death, 16).toLowerCase(),
     fps: { a: r1(num(f.a, 0, 300)), m: r1(num(f.m, 0, 300)), lo: ent(f.lo, 0, 36000), n: ent(f.n, 0, 36000), q: Math.round(num(f.q, 0, 5) * 100) / 100 },
     bpm: ent(b.bpm, 0, 400), map: b.map ? 1 : 0, qm: texto(b.qm, 10),
+    qh: Array.from({ length: 5 }, (_, i) => ent(Array.isArray(b.qh) ? b.qh[i] : 0, 0, 36000)),
     dev: { app: d.app ? 1 : 0, touch: d.touch ? 1 : 0, dpr: r1(num(d.dpr, 0, 10)), scr: texto(d.scr, 12), cores: ent(d.cores, 0, 256), mem: num(d.mem, 0, 512), gpu: texto(d.gpu, 60) },
   };
   return { mid, score, kills, level, dur, data };
 }
 // El juego sube de nivel cada 20 bajas y el puntaje mínimo por baja es pequeño: lo que no cuadra no entra al ranking.
 const sospechosa = m => m.kills > 6 + m.dur * 12 || m.score > 2000 + m.dur * 5000 || m.score < m.kills * 2
-  || Math.abs(m.level - (1 + Math.floor(m.kills / 20))) > 1 || m.data.w.reduce((s, a) => s + a[6], 0) > m.kills + 2;
+  || (!m.data.mp && Math.abs(m.level - (1 + Math.floor(m.kills / 20))) > 1) || m.data.w.reduce((s, a) => s + a[6], 0) > m.kills + 2;
 
 /* ---------- almacenamiento: PostgreSQL ---------- */
 async function persistPg(url) {
@@ -142,7 +144,7 @@ async function persistPg(url) {
           [m.playerId, m.mid, new Date(m.at), m.score, m.kills, m.level, m.dur, m.suspect, JSON.stringify(m.data)]);
         if (!r.rowCount) return null;                                   // ya estaba guardada
         if (m.suspect) await c.query('update nbr_players set last_at=$2 where id=$1', [m.playerId, new Date(m.at)]);
-        else await c.query('update nbr_players set n=n+1, kills=kills+$2, best=greatest(best,$3), best_lv=greatest(best_lv,$4), dur=dur+$5, last_at=$6 where id=$1', [m.playerId, m.kills, m.score, m.level, m.dur, new Date(m.at)]);
+        else await c.query('update nbr_players set n=n+1, kills=kills+$2, best=greatest(best,$3), best_lv=greatest(best_lv,$4), dur=dur+$5, last_at=$6 where id=$1', [m.playerId, m.kills, m.data.mp ? 0 : m.score, m.data.mp ? 0 : m.level, m.dur, new Date(m.at)]);
         return { pk: Number(r.rows[0].pk) };
       });
     },
@@ -239,7 +241,8 @@ function tablaRank(por, per) {
       if (x.suspect || x.at < desde) continue;
       const p = E.jug.get(x.playerId); if (!p || p.hidden) continue;
       let a = m.get(p.id); if (!a) m.set(p.id, a = { id: p.id, nick: p.nick, v: 0, lv: 0 });
-      a.lv = Math.max(a.lv, x.level); if (por === 'score') a.v = Math.max(a.v, x.score); else a.v += x.kills;
+      const mp = x.data && x.data.mp; if (!mp) a.lv = Math.max(a.lv, x.level);
+      if (por === 'score') { if (!mp) a.v = Math.max(a.v, x.score); } else a.v += x.kills;
     }
     filas = [...m.values()].filter(a => a.v > 0);
   }
@@ -276,8 +279,27 @@ function agregar(ms) {
   }
   return o;
 }
+/* Calidad gráfica inicial recomendada por modelo de gráfica. Se usan las partidas en modo AUTO (el juego ajusta solo) y se mira en qué nivel
+   pasó el tiempo cada teléfono (mediana ponderada por segundos). 0 = la más alta, 4 = la más baja; el inicio nunca pasa de 3. Hace falta
+   mínimo 3 partidas, 5 minutos y 2 jugadores distintos con esa gráfica; si no, no se recomienda nada y el juego se ajusta solo como siempre. */
+const REC_PARTIDAS = 3, REC_SEG = 300, REC_JUG = 2, REC_MAX_INI = 3;
+function rendimientoTabla() {
+  if (E.rend && E.rend.len === E.partidas.length && Date.now() - E.rend.t < 300000) return E.rend.m;
+  const m = new Map();
+  for (const x of E.partidas) {
+    const d = x.data; if (x.suspect || !d || d.qm !== 'auto' || !Array.isArray(d.qh) || !d.dev || !d.dev.gpu) continue;
+    const sec = d.qh.reduce((a, b) => a + b, 0); if (sec < 20) continue;
+    const k = d.dev.gpu.toLowerCase(); let g = m.get(k); if (!g) m.set(k, g = { n: 0, sec: 0, h: [0, 0, 0, 0, 0], jug: new Set(), ql: null });
+    g.n++; g.sec += sec; d.qh.forEach((v, i) => { g.h[i] += v; }); g.jug.add(x.playerId);
+  }
+  for (const g of m.values()) {
+    if (g.n < REC_PARTIDAS || g.sec < REC_SEG || g.jug.size < REC_JUG) continue;
+    let acc = 0; for (let i = 0; i < 5; i++) { acc += g.h[i]; if (acc >= g.sec / 2) { g.ql = Math.min(i, REC_MAX_INI); break; } }
+  }
+  E.rend = { t: Date.now(), len: E.partidas.length, m }; return m;
+}
 function resumenPersonal(p) {
-  const ms = E.partidas.filter(m => m.playerId === p.id && !m.suspect), o = agregar(ms);
+  const ms = E.partidas.filter(m => m.playerId === p.id && !m.suspect && !(m.data && m.data.mp)), o = agregar(ms);
   if (!o.n) return { n30: 0 };
   let fav = 0; o.w.forEach((x, i) => { if (x.t > o.w[fav].t) fav = i; });
   const tt = o.w.reduce((s, x) => s + x.t, 0), im = o.w.reduce((s, x) => s + x.im, 0), dmg = o.w.reduce((s, x) => s + x.dmg, 0), dist = o.w.reduce((s, x) => s + x.dist, 0), sk = o.w.reduce((s, x) => s + x.sk, 0);
@@ -372,12 +394,16 @@ export function montarPerfiles(app, { keyOk }) {
     let g; try { g = await E.persist.partida(m); } catch (e) { E.mids.delete(p.id + ':' + v.mid); console.log('[perfiles] partida:', e.message); return bad(res, 503, 'No se pudo guardar la partida, se reintentará.'); }
     if (!g) return res.json({ ok: true, repetida: true, rank: rangoDe(p) });
     m.pk = g.pk; E.partidas.push(m);
-    const record = !m.suspect && v.score > p.best;
-    if (!m.suspect) { p.n++; p.kills += v.kills; p.best = Math.max(p.best, v.score); p.bestLv = Math.max(p.bestLv, v.level); p.dur += v.dur; }
+    const mp = !!v.data.mp, record = !m.suspect && !mp && v.score > p.best;
+    if (!m.suspect) { p.n++; p.kills += v.kills; if (!mp) { p.best = Math.max(p.best, v.score); p.bestLv = Math.max(p.bestLv, v.level); } p.dur += v.dur; }
     p.lastAt = m.at; E.cache.clear();
-    res.json({ ok: true, record, noCuenta: m.suspect, rank: rangoDe(p), stats: statsDe(p) });
+    res.json({ ok: true, record, mp, noCuenta: m.suspect, rank: rangoDe(p), stats: statsDe(p) });
   });
 
+  r.get('/rendimiento', (req, res) => {
+    const k = texto(req.query.gpu, 60).toLowerCase(), g = k ? rendimientoTabla().get(k) : null;
+    res.json({ ok: true, ql: g && g.ql !== null ? g.ql : null, n: g ? g.n : 0 });
+  });
   r.get('/ranking', (req, res) => {
     const por = req.query.por === 'kills' ? 'kills' : 'score', per = ['day', 'week'].includes(req.query.per) ? req.query.per : 'all', n = ent(req.query.n, 1, 50, 20);
     const t = tablaRank(por, per), yo = quien(req), f = yo && t.pos.get(yo.id);
@@ -422,7 +448,8 @@ export const perfilesListos = () => E.listo;
 /* ---------- panel: página HTML ---------- */
 function panel(clave, dias) {
   const ahora = Date.now(), desde = ahora - dias * DAY;
-  const ms = E.partidas.filter(m => m.at >= desde && !m.suspect), sus = E.partidas.filter(m => m.at >= desde && m.suspect).length;
+  const ms = E.partidas.filter(m => m.at >= desde && !m.suspect && !(m.data && m.data.mp)), sus = E.partidas.filter(m => m.at >= desde && m.suspect).length;
+  const mpn = E.partidas.filter(m => m.at >= desde && m.data && m.data.mp).length;
   const o = agregar(ms), hoy = E.partidas.filter(m => m.at >= ahora - DAY).length, sem = E.partidas.filter(m => m.at >= ahora - 7 * DAY).length;
   const mx = (obj, f = x => x) => Math.max(1, ...Object.values(obj).map(f));
   const bar = (v, max, c = '') => `<span class="b"><i class="${c}" style="width:${Math.min(100, Math.round(100 * v / (max || 1)))}%"></i></span>`;
@@ -438,13 +465,13 @@ function panel(clave, dias) {
     ['Almacenamiento', E.persist ? (E.persist.persistente ? `<b class="ok">${esc(E.persist.tipo)} ✔ permanente</b>` : `<b class="mal">${esc(E.persist.tipo)} ⚠ se borra cuando Render reinicia. Pon DATABASE_URL.</b>`) : '<b class="mal">sin iniciar</b>'],
     ...(E.error ? [['Último error', `<b class="mal">${esc(E.error)}</b>`]] : []),
     ['Jugadores con perfil', fmt(E.jug.size)], ['Partidas hoy / 7 días / ' + dias + ' días', `${hoy} / ${sem} / ${E.partidas.filter(m => m.at >= desde).length}`],
-    ['Partidas que no cuentan para el ranking (puntaje inusual)', sus], ['Duración media de partida', hh(o.n ? o.dur / o.n : 0)], ['Bajas totales (' + dias + ' d)', fmt(o.kills)],
+    ['Partidas que no cuentan para el ranking (puntaje inusual)', sus], ['Duración media de partida', hh(o.n ? o.dur / o.n : 0)], ['Bajas totales en solitario (' + dias + ' d)', fmt(o.kills)], ['Partidas multijugador (' + dias + ' d, solo cuentan para el ranking de bajas)', fmt(mpn)],
     ['Servidor encendido desde hace', hh((ahora - E.desde) / 1000)]]) + `</section>`;
 
   const gp = Object.entries(o.gpu).sort((x, y) => y[1].n - x[1].n).slice(0, 15);
-  h += `<section><h2>Rendimiento por dispositivo</h2><p class="n">FPS medio, segundos por debajo de 30 FPS y nivel de calidad medio (1 = el más alto). Si un dispositivo pasa del 15 % bajo 30 FPS, hay que bajarle la carga.</p>` +
-    tabla(['Gráfica / dispositivo', 'Partidas', 'FPS medio', 'FPS mín. medio', '% bajo 30', 'Calidad'], gp.map(([k, g]) => {
-      const lo = pct(g.lo, g.sec); return [gpuCorta(k), g.n, prom(g.s, g.sec), prom(g.ms, g.n), `<b class="${lo > 15 ? 'mal' : lo > 5 ? 'med' : 'ok'}">${lo} %</b>`, prom(g.q, g.sec, 2)];
+  h += `<section><h2>Rendimiento por dispositivo</h2><p class="n">FPS medio, segundos por debajo de 30 FPS y nivel de calidad medio (1 = el más alto). Si un dispositivo pasa del 15 % bajo 30 FPS, hay que bajarle la carga. La calidad va de 0 (la más alta) a 4 (la más baja). «Inicio» es la calidad con la que arrancará el juego en un teléfono nuevo con esa gráfica (hacen falta 3 partidas, 5 minutos y 2 jugadores; si no, «–» y el juego se ajusta solo).</p>` +
+    tabla(['Gráfica / dispositivo', 'Partidas', 'FPS medio', 'FPS mín. medio', '% bajo 30', 'Calidad', 'Inicio'], gp.map(([k, g]) => {
+      const lo = pct(g.lo, g.sec); return [gpuCorta(k), g.n, prom(g.s, g.sec), prom(g.ms, g.n), `<b class="${lo > 15 ? 'mal' : lo > 5 ? 'med' : 'ok'}">${lo} %</b>`, prom(g.q, g.sec, 2), (rt => (rt && rt.ql !== null ? rt.ql : '–'))(rendimientoTabla().get(String(k).replace(/ · app$/, '').toLowerCase()))];
     })) + (o.fps.n ? `<p class="n">Global: ${prom(o.fps.s, o.fps.n)} FPS medio · ${pct(o.fps.lo, o.fps.n)} % del tiempo bajo 30 FPS.</p>` : '<p class="n">Aún no hay datos.</p>') + `</section>`;
 
   const maxT = mx(Object.fromEntries(o.w.map((x, i) => [i, x.t])));
