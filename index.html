@@ -112,7 +112,7 @@ body:not(.play) #fans,body:not(.play) #likes{display:none}
 @keyframes abp{50%{transform:scale(1.07)}}
 .score small .cr{display:block;margin-top:2px;color:#ffe14d;font-weight:800;text-shadow:0 0 8px #ffe14d88}
 .score small .cr.ok{color:#7dff5a;text-shadow:0 0 8px #7dff5a88}
-#doorBtn{position:fixed;left:43%;top:58%;transform:translateX(-50%);padding:10px 16px;border-radius:12px;border:2px solid #7dff5a;background:rgba(8,4,20,.84);color:#fff;font-family:var(--disp);font-weight:800;font-size:12.5px;letter-spacing:.06em;display:none;z-index:4;touch-action:manipulation;box-shadow:0 0 16px #7dff5a66;white-space:nowrap}
+#doorBtn{position:fixed;left:43%;top:58%;transform:translateX(-50%);padding:10px 16px;border-radius:12px;border:2px solid #7dff5a;background:rgba(8,4,20,.84);color:#fff;font-family:var(--disp);font-weight:800;font-size:12.5px;letter-spacing:.06em;display:none;z-index:4;touch-action:manipulation;pointer-events:auto;box-shadow:0 0 16px #7dff5a66;white-space:nowrap}
 #doorBtn.on{display:block;animation:abp .9s ease-in-out infinite}
 #doorBtn.no{border-color:#ff6b8a;color:#ffc2cf;box-shadow:0 0 12px #ff6b8a55;animation:none}
 #radar{position:fixed;left:max(12px,env(safe-area-inset-left,0px));top:62px;width:92px;height:92px;border-radius:50%;background:rgba(0,0,0,.42);pointer-events:none}
@@ -317,10 +317,11 @@ body.play #mates{display:flex}
   <div id="perks"></div>
   <div id="tgt"><span id="tgtName">BARRERA</span><div><i id="tgtFill"></i></div></div>
   <div id="feed"></div>
-  <div id="banner"></div><button id="doorBtn" aria-label="Abrir puerta"></button>
+  <div id="banner"></div>
 </div>
 
 <div id="aimzone"></div>
+<button id="doorBtn" aria-label="Abrir puerta"></button>
 <div id="cross"><div id="xb"></div><div id="xw"></div><div id="xr"></div><div id="xd"></div><div id="xt">ATASCADA</div><div id="xp"></div></div>
 <div id="joyzone"><div id="joybase"><div id="knob"></div></div></div>
 <canvas id="radar" width="92" height="92"></canvas>
@@ -1779,7 +1780,7 @@ function pickTick(rdt){S.pickT-=rdt; upBar.style.transform='scaleX('+clamp(S.pic
 
 /* ================= Entrada ================= */
 const joy={x:0,y:0,id:null,cx:0,cy:0,R:48}, jz=$('joyzone'), jb=$('joybase'), kn=$('knob');
-const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=1;if(e.key.toLowerCase()==='f')W.try();if(e.key===' ')useAbility();if(e.key.toLowerCase()==='e')useUlt();if(e.key==='Shift'||e.key.toLowerCase()==='q')doDodge();});addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=0;});
+const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=1;if(e.key.toLowerCase()==='r')W.try();if(e.key===' ')useAbility();if(e.key.toLowerCase()==='e')useUlt();if(e.key==='Shift'||e.key.toLowerCase()==='q')doDodge();});addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=0;});
 function joyX(){let x=joy.x+(keys.d?1:0)-(keys.a?1:0);x=clamp(x,-1,1);return Math.abs(x)<.1?0:x;}
 function joyY(){let y=joy.y+(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0);y=clamp(y,-1,1);return Math.abs(y)<.12?0:y;}
 jz.addEventListener('pointerdown',e=>{e.preventDefault();if(joy.id!==null)return;joy.id=e.pointerId;try{jz.setPointerCapture(e.pointerId)}catch(_){}const r=jz.getBoundingClientRect();joy.cx=e.clientX;joy.cy=e.clientY;jb.style.left=(e.clientX-r.left)+'px';jb.style.top=(e.clientY-r.top)+'px';jb.classList.add('act');});
@@ -2161,7 +2162,7 @@ function updHud(){ if(fansDirty){fansDirty=false;renderFans();}
   upd('di',S.level+'|'+S.kills+'|'+(W.on?W.cr+'|'+(W.nOpen<4&&W.cr>=W.price()?1:0):-1),()=>{const d=$('dist');d.textContent='NIVEL '+S.level+' · '+S.kills+' BAJAS';if(W.on){const c=document.createElement('span');c.className='cr'+(W.nOpen<4&&W.cr>=W.price()?' ok':'');c.textContent=W.cr+' CR';d.appendChild(c);}});
   upd('cb',S.combo,v=>$('combo').textContent=v>1?'x'+v:'');
   { const k=W.on?W.nOpen+'|'+W.near+'|'+(W.cr>=W.price()?1:0)+'|'+(W.price()-W.cr)+'|'+S.running:'off'; upd('wk',k,()=>{ const db=$('doorBtn');
-      const nr=W.on&&W.near>=0&&W.nOpen<4&&S.running; db.classList.toggle('on',nr); if(nr){const ok=W.cr>=W.price(); db.classList.toggle('no',!ok); db.textContent=ok?'ABRIR PUERTA '+W.wings[W.near].n+' · '+W.price()+' CR':'PUERTA '+W.wings[W.near].n+' · FALTAN '+(W.price()-W.cr)+' CR';} }); }
+      const nr=W.on&&W.near>=0&&W.nOpen<4&&S.running; db.classList.toggle('on',nr); if(nr){const ok=W.cr>=W.price(); db.classList.toggle('no',!ok); db.textContent=ok?'ABRIR PUERTA '+W.wings[W.near].n+' · '+W.price()+' CR'+(matchMedia('(pointer:fine)').matches?' [R]':''):'PUERTA '+W.wings[W.near].n+' · FALTAN '+(W.price()-W.cr)+' CR';} }); }
   upd('gp',Math.round(S.diff*100),v=>{const g=$('gapFill');g.style.transform='scaleX('+clamp(v/100,0,1)+')';g.style.background=v>70?'var(--bad)':v>40?'var(--c3)':'var(--ok)';});
   upd('fl',Math.round(S.flow/2)*2,v=>{const f=$('flowFill');f.style.transform='scaleX('+clamp(v/100,0,1)+')';f.style.background=v>=100?'var(--c3)':v>=50?'var(--c1)':'var(--c2)';$('flowTx').textContent=v>=100?'MÁX':v>=26?v+'%':'';});
   const dd=$('dodge'); upd('dg',Math.round(S.dodgeCd/DODGE_CD*10),v=>{dd.style.setProperty('--p',(v/10).toFixed(1));dd.classList.toggle('ready',v===0);});
