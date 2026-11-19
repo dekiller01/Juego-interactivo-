@@ -599,7 +599,7 @@ const WING=[
  {k:'S',n:'SUR',   tl:(u,v)=>[-21+v,22+u],  wp:(u,v)=>[-21+v,22+u],  ax:'z'},
  {k:'O',n:'OESTE', tl:(u,v)=>[-23-u,-21+v], wp:(u,v)=>[-22-u,-21+v], ax:'x'},
  {k:'N',n:'NORTE', tl:(u,v)=>[-21+v,-23-u], wp:(u,v)=>[-21+v,-22-u], ax:'z'}];
-for(const w of WING){w.E=new Uint8Array(NE);w.open=false;w.sign=null;w.slab=null;w.aff=-1;w.dy=0;}
+for(const w of WING){w.E=new Uint8Array(NE);w.lock=new Uint8Array(NE);w.rooms=[];w.marks=[];w.open=false;w.sign=null;w.slab=null;w.aff=-1;w.dy=0;}
 const V={on:false,act:false,x0:-HX,x1:HX,z0:-HZ,z1:HZ,cr:0,nOpen:0,wings:WING,PRICES,WH,DH,N,OFF,
   rt:0,phase:0,plan:null,ghosts:[],slabs:[],at:0,reshapes:0,near:-1,dirty:true,vis:true};
 
@@ -614,12 +614,26 @@ function genMaze(E){
   while(st.length){const c=st[st.length-1],opts=NB[c].filter(x=>!seen[x[0]]); if(!opts.length){st.pop();continue;} const [d,e]=opts[(Math.random()*opts.length)|0]; E[e]=1;seen[d]=1;st.push(d);}
   const cl=shuffle([...Array(NE).keys()].filter(e=>!E[e])); for(let i=0;i<4&&i<cl.length;i++)E[cl[i]]=1;   /* algunos atajos: no es un árbol perfecto */
 }
+const ROOM=14;   /* minizonas: 2×2 celdas fundidas en una sala abierta de 14×14 m con 2 columnas de cobertura */
+function pickRooms(w){
+  w.rooms=[]; w.lock.fill(0);
+  const ba=Math.random()<.5?0:3, A={a:1+((Math.random()*2)|0),b:ba}, B={a:2+((Math.random()*2)|0),b:3-ba};
+  for(const r of [A,B]){ r.t=(Math.random()*2)|0; w.rooms.push(r); const a=r.a,b=r.b; for(const e of [a*5+b,a*5+b+1,20+a*4+b,20+(a+1)*4+b])w.lock[e]=1; }
+}
+function roomTiles(w,r,fn){ const u0=PIT*r.a+2,v0=PIT*r.b+2; for(let u=u0;u<u0+ROOM;u++)for(let v=v0;v<v0+ROOM;v++){const [tx,tz]=w.tl(u,v);fn(tx,tz,u-u0,v-v0);} }
+function carveRoom(w,r){
+  const cu=PIT*(r.a+1),cv=PIT*(r.b+1);   /* el poste de la esquina común de las 4 celdas desaparece */
+  for(let u=cu;u<cu+2;u++)for(let v=cv;v<cv+2;v++){const [tx,tz]=w.tl(u,v),i=ti(tx,tz);solid[i]=0;ht[i]=WH;}
+  const pl=r.t?[[3,9],[9,3]]:[[3,3],[9,9]]; const u0=PIT*r.a+2,v0=PIT*r.b+2;   /* dos columnas de 2×2 para cubrirse y rodear */
+  for(const [du,dv] of pl)for(let u=u0+du;u<u0+du+2;u++)for(let v=v0+dv;v<v0+dv+2;v++){const [tx,tz]=w.tl(u,v);solid[ti(tx,tz)]=1;}
+}
 function setEdge(w,e,open){ const [u0,u1,v0,v1]=eRect(e); for(let u=u0;u<u1;u++)for(let v=v0;v<v1;v++){const [tx,tz]=w.tl(u,v),i=ti(tx,tz);solid[i]=open?0:1;ht[i]=WH;} }
 function setTrans(w,e,f){ const [u0,u1,v0,v1]=eRect(e); for(let u=u0;u<u1;u++)for(let v=v0;v<v1;v++){const [tx,tz]=w.tl(u,v);trans[ti(tx,tz)]=f;} }
 function eBox(w,e){ const [u0,u1,v0,v1]=eRect(e),a=w.wp(u0,v0),b=w.wp(u1,v1); return {x0:Math.min(a[0],b[0]),x1:Math.max(a[0],b[0]),z0:Math.min(a[1],b[1]),z1:Math.max(a[1],b[1])}; }
 function carve(w){
   for(let a=0;a<CN;a++)for(let b=0;b<CN;b++)for(let u=PIT*a+2;u<PIT*a+8;u++)for(let v=PIT*b+2;v<PIT*b+8;v++){const [tx,tz]=w.tl(u,v),i=ti(tx,tz);solid[i]=0;ht[i]=WH;}
   for(let e=0;e<NE;e++)setEdge(w,e,!!w.E[e]);
+  for(const r of w.rooms)carveRoom(w,r);
   for(let u=0;u<2;u++)for(let v=18;v<24;v++){const [tx,tz]=w.tl(u,v),i=ti(tx,tz);solid[i]=0;ht[i]=DH;}
 }
 
@@ -664,7 +678,10 @@ V.wall=function(p,m){   /* ¿pegado a un muro o al borde? (embestidas, saltos) *
 
 /* ---------- huecos libres (apariciones) ---------- */
 let core=[],coreDirty=true;
-function rebuildCore(){ core=[]; for(let tz=-OFF+1;tz<OFF-1;tz++)for(let tx=-OFF+1;tx<OFF-1;tx++){ if(sol(tx,tz)||dtile[ti(tx,tz)])continue; let ok=true; for(let dz=-1;dz<=1&&ok;dz++)for(let dx=-1;dx<=1;dx++)if(sol(tx+dx,tz+dz)){ok=false;break;} if(ok)core.push(tx,tz); } coreDirty=false; }
+let rcore=[];
+const isCore=(tx,tz)=>{ if(sol(tx,tz)||dtile[ti(tx,tz)])return false; for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++)if(sol(tx+dx,tz+dz))return false; return true; };
+function rebuildCore(){ core=[];rcore=[]; for(let tz=-OFF+1;tz<OFF-1;tz++)for(let tx=-OFF+1;tx<OFF-1;tx++){ if(isCore(tx,tz))core.push(tx,tz); }
+  for(const w of WING)if(w.open)for(const r of w.rooms)roomTiles(w,r,(tx,tz)=>{ if(isCore(tx,tz))rcore.push(tx,tz); }); coreDirty=false; }
 V.snap=function(x,z){   /* punto libre más cercano (centro de baldosa) */
   if(!sol(Math.floor(x),Math.floor(z)))return {x,z};
   const cx=Math.floor(x),cz=Math.floor(z);
@@ -672,8 +689,8 @@ V.snap=function(x,z){   /* punto libre más cercano (centro de baldosa) */
   return {x:P.x,z:P.z};
 };
 V.rndSpot=function(minD){   /* hueco al azar (sala o alas abiertas) lejos del jugador */
-  if(coreDirty)rebuildCore(); const n=core.length/2; if(!n)return null;
-  for(let i=0;i<16;i++){const k=((Math.random()*n)|0)*2,x=core[k]+.5,z=core[k+1]+.5; if(Math.hypot(x-P.x,z-P.z)>minD&&!inPillar(x,z,1.5))return {x,z};}
+  if(coreDirty)rebuildCore(); const n0=core.length/2; if(!n0)return null;
+  for(let i=0;i<16;i++){const ar=(rcore.length&&Math.random()<.5)?rcore:core,n=ar.length/2,k=((Math.random()*n)|0)*2,x=ar[k]+.5,z=ar[k+1]+.5; if(Math.hypot(x-P.x,z-P.z)>minD&&!inPillar(x,z,1.5))return {x,z};}
   return null;
 };
 
@@ -746,6 +763,9 @@ V.rebuild=function(){ buildGeo(); coreDirty=true; V.dirty=true; };
 
 /* puertas: panel con el precio en la pared de la sala */
 const matDoor=new THREE.MeshBasicMaterial({color:0x1b1030});
+const markG=[new THREE.RingGeometry(1.55,2.0,40),new THREE.CircleGeometry(.4,20)], markM=new THREE.MeshBasicMaterial({color:0x19f0ff,transparent:true,opacity:.8,depthWrite:false,side:THREE.DoubleSide,fog:false});
+function addMarks(w){ for(const r of w.rooms){ const c=w.wp(PIT*r.a+2+ROOM/2,PIT*r.b+2+ROOM/2); for(const g of markG){const m=new THREE.Mesh(g,markM);m.rotation.x=-Math.PI/2;m.position.set(c[0],.05,c[1]);m.renderOrder=2;grp.add(m);w.marks.push(m);} } }
+function clearMarks(w){ for(const m of w.marks)grp.remove(m); w.marks=[]; }
 const COL=['#19f0ff','#ff2fd0','#ffe14d','#7dff5a'];
 function drawSign(w,idx){
   const c=w.sign.cv,x=c.getContext('2d'),price=PRICES[Math.min(V.nOpen,3)],aff=V.cr>=price,col=aff?'#7dff5a':COL[idx];
@@ -774,20 +794,20 @@ V.reset=function(on){
   for(const g of V.ghosts)grp.remove(g); V.ghosts=[]; for(const s of V.slabs)grp.remove(s.m); V.slabs=[];
   solid.fill(1);trans.fill(0);dtile.fill(0);ht.fill(0);
   for(let tz=-22;tz<22;tz++)for(let tx=-22;tx<22;tx++){const i=ti(tx,tz);solid[i]=0;ht[i]=RH;}
-  for(const w of WING){ w.open=false; genMaze(w.E); for(let u=0;u<2;u++)for(let v=18;v<24;v++){const [tx,tz]=w.tl(u,v);dtile[ti(tx,tz)]=1;} }
+  for(const w of WING){ clearMarks(w); w.open=false; genMaze(w.E); pickRooms(w); for(let e=0;e<NE;e++)if(w.lock[e])w.E[e]=1; for(let u=0;u<2;u++)for(let v=18;v<24;v++){const [tx,tz]=w.tl(u,v);dtile[ti(tx,tz)]=1;} }
   V.rebuild(); grp.visible=V.on; for(const m of HALLW)m.visible=!V.on; V._a=-1; WING.forEach((w,j)=>{w.slab.visible=V.on;w.slab.position.y=0;w.dy=0;drawSign(w,j);});
 };
 V.openWing=function(i,free){
   const w=WING[i]; if(!w||w.open||!V.on)return false;
   const price=V.price(); if(!free){ if(V.cr<price)return false; V.cr-=price; }
-  w.open=true; V.nOpen++; carve(w); V.act=true;
+  w.open=true; V.nOpen++; carve(w); addMarks(w); V.act=true;
   if(w.k==='E')V.x1=64; else if(w.k==='O')V.x0=-64; else if(w.k==='S')V.z1=64; else V.z0=-64;
   w.dy=0.0001; V.rebuild(); if(!V.rt)V.rt=RESHAPE; for(let j=0;j<4;j++)if(!WING[j].open)drawSign(WING[j],j);
   return true;
 };
 V.guards=function(i){   /* unos cuantos enemigos aparecen en el ala recién abierta */
   const w=WING[i], n=Math.max(0,Math.min(3+V.nOpen,maxEnemies()-enemies.length)); let k=0;
-  for(let t=0;t<40&&k<n;t++){ const a=2+((Math.random()*3)|0),b=(Math.random()*5)|0, u=PIT*a+2+rand(1.5,4.5), v=PIT*b+2+rand(1.5,4.5), q=w.wp(u,v); spawnEnemy(pickType(domBand()),q[0],q[1]); k++; }
+  for(let t=0;t<40&&k<n;t++){ const r=w.rooms[(Math.random()*w.rooms.length)|0], u=PIT*r.a+2+rand(1.5,ROOM-1.5), v=PIT*r.b+2+rand(1.5,ROOM-1.5), q=w.wp(u,v); if(V.sp(q[0],q[1]))continue; spawnEnemy(pickType(domBand()),q[0],q[1]); k++; }
 };
 V.earn=function(n){ if(!V.on)return; const b=V.cr; V.cr+=n; const pr=V.price(); if(V.nOpen<4&&b<pr&&V.cr>=pr){ banner('¡PUEDES ABRIR UNA PUERTA!','#7dff5a','acércate a una puerta de la sala · '+pr+' CR'); A.chime([523,784,1047]); } };
 
@@ -796,7 +816,7 @@ function entsIn(box,m){ if(P.x>box.x0-m&&P.x<box.x1+m&&P.z>box.z0-m&&P.z<box.z1+
 function makePlan(){
   const plan=[]; for(let i=0;i<4;i++){const w=WING[i]; if(!w.open)continue;
     const E=Uint8Array.from(w.E), opened=[],closed=[], k=3+((Math.random()*3)|0);
-    const cand=shuffle([...Array(NE).keys()].filter(e=>!E[e])), was=shuffle([...Array(NE).keys()].filter(e=>E[e]));
+    const cand=shuffle([...Array(NE).keys()].filter(e=>!E[e])), was=shuffle([...Array(NE).keys()].filter(e=>E[e]&&!w.lock[e]));
     for(const o of cand){ if(opened.length>=k)break; E[o]=1; let ok=false;   /* abre uno y cierra otro: siempre queda todo conectado */
       for(const c of was){ if(closed.includes(c)||entsIn(eBox(w,c),1.6))continue; E[c]=0; if(connected(E)){closed.push(c);opened.push(o);ok=true;break;} E[c]=1; }
       if(!ok)E[o]=0; }
