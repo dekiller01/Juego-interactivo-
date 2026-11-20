@@ -115,6 +115,13 @@ body:not(.play) #fans,body:not(.play) #likes{display:none}
 #doorBtn{position:fixed;left:43%;top:58%;transform:translateX(-50%);padding:10px 16px;border-radius:12px;border:2px solid #7dff5a;background:rgba(8,4,20,.84);color:#fff;font-family:var(--disp);font-weight:800;font-size:12.5px;letter-spacing:.06em;display:none;z-index:4;touch-action:manipulation;pointer-events:auto;box-shadow:0 0 16px #7dff5a66;white-space:nowrap}
 #doorBtn.on{display:block;animation:abp .9s ease-in-out infinite}
 #doorBtn.no{border-color:#ff6b8a;color:#ffc2cf;box-shadow:0 0 12px #ff6b8a55;animation:none}
+#mapBtn{position:fixed;left:12px;top:152px;z-index:4;display:none;padding:7px 12px;border-radius:10px;border:2px solid #28e6ff;background:rgba(8,4,20,.84);color:#fff;font-family:var(--disp);font-weight:800;font-size:12px;letter-spacing:.08em;touch-action:manipulation;pointer-events:auto;box-shadow:0 0 12px #28e6ff55}
+#mapBtn.show{display:block}
+#mapBtn.on{background:#28e6ff;color:#06121c}
+#mapBox{position:fixed;left:50%;top:50%;transform:translate(-50%,-47%);width:min(60vh,340px);display:none;z-index:3;pointer-events:none;background:rgba(6,3,16,.8);border:2px solid #28e6ff77;border-radius:12px;padding:6px;box-shadow:0 0 22px #000a}
+#mapBox.on{display:block}
+#mapCv{display:block;width:100%;aspect-ratio:1/1}
+.mapcap{font:600 9.5px var(--disp);color:#c9c1ee;text-align:center;margin-top:4px;line-height:1.3}
 #radar{position:fixed;left:max(12px,env(safe-area-inset-left,0px));top:62px;width:92px;height:92px;border-radius:50%;background:rgba(0,0,0,.42);pointer-events:none}
 .chars{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .chars button{display:flex;flex-direction:column;gap:2px;padding:8px 2px;font-family:var(--disp);font-size:11px;color:#fff;background:rgba(255,255,255,.06);border:1px solid #fff3;border-radius:4px;cursor:pointer}
@@ -322,6 +329,8 @@ body.play #mates{display:flex}
 
 <div id="aimzone"></div>
 <button id="doorBtn" aria-label="Abrir puerta"></button>
+<button id="mapBtn" aria-label="Mapa del laberinto">MAPA</button>
+<div id="mapBox"><canvas id="mapCv" width="380" height="380"></canvas><div class="mapcap">▲ tú · <b style="color:#ff3b5c">●</b> enemigos · <b style="color:#35b4d8">■</b> minizonas · <b style="color:#b07cff">■</b> uniones · <b style="color:#ffd84a">■</b> puerta cerrada</div></div>
 <div id="cross"><div id="xb"></div><div id="xw"></div><div id="xr"></div><div id="xd"></div><div id="xt">ATASCADA</div><div id="xp"></div></div>
 <div id="joyzone"><div id="joybase"><div id="knob"></div></div></div>
 <canvas id="radar" width="92" height="92"></canvas>
@@ -583,9 +592,8 @@ const HALLW=[];
   for(const r of [5.6,11.4,17.2]){const ring=new THREE.Mesh(new THREE.RingGeometry(r,r+.22,72),matRib);ring.rotation.x=-Math.PI/2;ring.position.y=.02;scene.add(ring);}
 })();
 /* ================= v26 · EXPANSIÓN: puertas con créditos y laberintos que cambian ================= */
-/* Cuadrícula de baldosas de 1 m (128×128). La sala de siempre ocupa [-22,22). Hay 4 alas de laberinto de 5×5 celdas (celda libre de 6 m + muro de 2 m),
-   UNIDAS entre sí por 4 pasillos fijos en las esquinas (anillo N-E-S-O), pero la sala solo tiene 2 salidas (2 puertas de 6 m, en lados opuestos al azar).
-   Los créditos se ganan matando y se gastan abriendo las puertas: la primera abre todo el laberinto unido, la segunda es otra salida.
+/* Cuadrícula de baldosas de 1 m (128×128). La sala de siempre ocupa [-22,22). Cada pared tiene una puerta (6 m) que da a un ala de
+   laberinto de 5×5 celdas (celda libre de 6 m + muro de 2 m). Los créditos se ganan matando y se gastan abriendo puertas.
    Pasado un rato los pasillos cambian: se cierran unos y se abren otros, siempre dejando un camino entre todas las celdas. */
 const W=(()=>{
 const N=128,OFF=64,WH=7,DH=4.2,RH=HH,PRICES=[300,600,1000,1500],RESHAPE=70,WARN=5,ANIM=1.1,PIT=8,CN=5,NE=40;
@@ -600,8 +608,8 @@ const WING=[
  {k:'S',n:'SUR',   tl:(u,v)=>[-21+v,22+u],  wp:(u,v)=>[-21+v,22+u],  ax:'z'},
  {k:'O',n:'OESTE', tl:(u,v)=>[-23-u,-21+v], wp:(u,v)=>[-22-u,-21+v], ax:'x'},
  {k:'N',n:'NORTE', tl:(u,v)=>[-21+v,-23-u], wp:(u,v)=>[-21+v,-22-u], ax:'z'}];
-for(const w of WING){w.E=new Uint8Array(NE);w.lock=new Uint8Array(NE);w.rooms=[];w.marks=[];w.open=false;w.exit=false;w.door=false;w.sign=null;w.slab=null;w.aff=-1;w.dy=0;}
-const V={on:false,act:false,x0:-HX,x1:HX,z0:-HZ,z1:HZ,cr:0,nOpen:0,nMax:2,exits:[],mazeOpen:false,links:[],wings:WING,PRICES,WH,DH,N,OFF,
+for(const w of WING){w.E=new Uint8Array(NE);w.lock=new Uint8Array(NE);w.rooms=[];w.marks=[];w.open=false;w.sign=null;w.slab=null;w.aff=-1;w.dy=0;}
+const V={on:false,act:false,x0:-HX,x1:HX,z0:-HZ,z1:HZ,cr:0,nOpen:0,nMax:4,pairs:[],partner:[-1,-1,-1,-1],links:[],joined:-1,wings:WING,PRICES,WH,DH,N,OFF,
   rt:0,phase:0,plan:null,ghosts:[],slabs:[],at:0,reshapes:0,near:-1,dirty:true,vis:true};
 
 /* ---------- laberinto: celdas 0..24 (a·5+b), aristas 0..39 ---------- */
@@ -631,24 +639,24 @@ function carveRoom(w,r){
 function setEdge(w,e,open){ const [u0,u1,v0,v1]=eRect(e); for(let u=u0;u<u1;u++)for(let v=v0;v<v1;v++){const [tx,tz]=w.tl(u,v),i=ti(tx,tz);solid[i]=open?0:1;ht[i]=WH;} }
 function setTrans(w,e,f){ const [u0,u1,v0,v1]=eRect(e); for(let u=u0;u<u1;u++)for(let v=v0;v<v1;v++){const [tx,tz]=w.tl(u,v);trans[ti(tx,tz)]=f;} }
 function eBox(w,e){ const [u0,u1,v0,v1]=eRect(e),a=w.wp(u0,v0),b=w.wp(u1,v1); return {x0:Math.min(a[0],b[0]),x1:Math.max(a[0],b[0]),z0:Math.min(a[1],b[1]),z1:Math.max(a[1],b[1])}; }
-function carveMaze(w){
+/* uniones entre alas vecinas: pasillos de 6 m por las esquinas. Cada partida se forman 2 parejas al azar (N-E + S-O, o N-O + S-E) y cada pareja se une
+   por UN pasillo, que aparece cuando las dos alas de la pareja están abiertas. Son fijos: el reordenado nunca los toca (la profundidad 0..2 es al azar).
+   Rectángulos [x0,x1,z0,z1] en baldosas (inclusive); w = índices de las alas (E0 S1 O2 N3) */
+function makeLinks(){
+  const r=()=>(Math.random()*3)|0; let p,q;
+  const L=[]; p=r();q=r(); L.push({k:'NE',w:[3,0],R:[[19,29+8*q,-30-8*p,-25-8*p],[24+8*q,29+8*q,-30-8*p,-20]]});   /* N(p) ↔ E(q) */
+  p=r();q=r(); L.push({k:'SE',w:[0,1],R:[[19,29+8*p,24+8*q,29+8*q],[24+8*p,29+8*p,19,29+8*q]]});                      /* E(p) ↔ S(q) */
+  p=r();q=r(); L.push({k:'SO',w:[1,2],R:[[-30-8*q,-20,24+8*p,29+8*p],[-30-8*q,-25-8*q,19,29+8*p]]});                  /* S(p) ↔ O(q) */
+  p=r();q=r(); L.push({k:'NO',w:[2,3],R:[[-30-8*p,-20,-30-8*q,-25-8*q],[-30-8*p,-25-8*p,-30-8*q,-20]]});               /* O(p) ↔ N(q) */
+  for(const l of L)l.done=false; return L;
+}
+function carveLink(l){ for(const r of l.R)for(let z=r[2];z<=r[3];z++)for(let x=r[0];x<=r[1];x++){const i=ti(x,z);solid[i]=0;ht[i]=WH;} l.done=true; }
+function carve(w){
   for(let a=0;a<CN;a++)for(let b=0;b<CN;b++)for(let u=PIT*a+2;u<PIT*a+8;u++)for(let v=PIT*b+2;v<PIT*b+8;v++){const [tx,tz]=w.tl(u,v),i=ti(tx,tz);solid[i]=0;ht[i]=WH;}
   for(let e=0;e<NE;e++)setEdge(w,e,!!w.E[e]);
   for(const r of w.rooms)carveRoom(w,r);
+  for(let u=0;u<2;u++)for(let v=18;v<24;v++){const [tx,tz]=w.tl(u,v),i=ti(tx,tz);solid[i]=0;ht[i]=DH;}
 }
-function carveDoor(w){ for(let u=0;u<2;u++)for(let v=18;v<24;v++){const [tx,tz]=w.tl(u,v),i=ti(tx,tz);solid[i]=0;ht[i]=DH;} }
-function setDoorTiles(w){ for(let u=0;u<2;u++)for(let v=18;v<24;v++){const [tx,tz]=w.tl(u,v);dtile[ti(tx,tz)]=1;} }
-/* uniones entre alas: 4 pasillos de 6 m por las esquinas (N-E, E-S, S-O, O-N). Cada uno sale de una celda del borde de un ala, rodea y entra por
-   el borde de la vecina; profundidad (0..2) al azar. Son fijos: el reordenado nunca los toca. Rectángulos [x0,x1,z0,z1] en baldosas (inclusive) */
-function makeLinks(){
-  const r=()=>(Math.random()*3)|0, L=[]; let p,q;
-  p=r();q=r(); L.push({k:'NE',p,q,R:[[19,29+8*q,-30-8*p,-25-8*p],[24+8*q,29+8*q,-30-8*p,-20]]});   /* N(p) ↔ E(q) */
-  p=r();q=r(); L.push({k:'SE',p,q,R:[[19,29+8*p,24+8*q,29+8*q],[24+8*p,29+8*p,19,29+8*q]]});       /* E(p) ↔ S(q) */
-  p=r();q=r(); L.push({k:'SO',p,q,R:[[-30-8*q,-20,24+8*p,29+8*p],[-30-8*q,-25-8*q,19,29+8*p]]});   /* S(p) ↔ O(q) */
-  p=r();q=r(); L.push({k:'NO',p,q,R:[[-30-8*p,-20,-30-8*q,-25-8*q],[-30-8*p,-25-8*p,-30-8*q,-20]]});/* O(p) ↔ N(q) */
-  return L;
-}
-function carveLinks(L){ for(const l of L)for(const r of l.R)for(let z=r[2];z<=r[3];z++)for(let x=r[0];x<=r[1];x++){const i=ti(x,z);solid[i]=0;ht[i]=WH;} }
 
 /* ---------- física: baldosas ---------- */
 V.sp=(x,z)=>sol(Math.floor(x),Math.floor(z));
@@ -764,10 +772,9 @@ function buildGeo(){
       if(ok){s=tx;h=hh;}else s=NONE;
     }
   }
-  for(const w of WING){   /* dinteles: sobre la puerta (lado sala, siempre; lado ala, cuando está abierta). Las paredes sin puerta son muro normal */
-    if(!w.exit)continue;
+  for(const w of WING){   /* dinteles: sobre la puerta (lado sala, siempre; lado ala, cuando está abierta) */
     const a=w.wp(0,18),b=w.wp(0,24),ax=w.ax==='x'; const u1=ax?a[1]/44:a[0]/44,u2=ax?b[1]/44:b[0]/44; wq(a[0],a[1],b[0],b[1],DH,RH,u1,u2);
-    if(w.door){const c=w.wp(2,18),d=w.wp(2,24); wq(c[0],c[1],d[0],d[1],DH,WH,u1,u2);}
+    if(w.open){const c=w.wp(2,18),d=w.wp(2,24); wq(c[0],c[1],d[0],d[1],DH,WH,u1,u2);}
   }
   const mk2=(g,pos,uv)=>{ g.dispose(); const ng=new THREE.BufferGeometry(); ng.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pos),3)); ng.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(uv),2)); return ng; };
   wallM.geometry=mk2(wallM.geometry,wp,wu); floorM.geometry=mk2(floorM.geometry,fp,fu); ceilM.geometry=mk2(ceilM.geometry,cp,cu);
@@ -784,8 +791,9 @@ const COL=['#19f0ff','#ff2fd0','#ffe14d','#7dff5a'];
 function drawSign(w,idx){
   const c=w.sign.cv,x=c.getContext('2d'),price=PRICES[Math.min(V.nOpen,3)],aff=V.cr>=price,col=aff?'#7dff5a':COL[idx];
   x.fillStyle='#0f0722';x.fillRect(0,0,256,192); x.strokeStyle=col;x.lineWidth=10;x.strokeRect(8,8,240,176); x.lineWidth=2;x.strokeRect(22,22,212,148);
-  x.textAlign='center';x.fillStyle=col; x.font='bold 30px Arial,sans-serif';x.fillText('PUERTA '+w.n,128,62);
-  x.font='bold 74px Arial,sans-serif';x.fillText(String(price),128,128); x.font='bold 26px Arial,sans-serif';x.fillStyle=aff?'#ffffff':'#9a8fc4';x.fillText(aff?'¡ABRIR!':'CRÉDITOS',128,162);
+  x.textAlign='center';x.fillStyle=col; x.font='bold 28px Arial,sans-serif';x.fillText('PUERTA '+w.n,128,54);
+  const pj=V.partner[idx]; if(pj>=0){x.font='bold 16px Arial,sans-serif';x.fillStyle='#b07cff';x.fillText('SE UNE CON '+WING[pj].n,128,76);x.fillStyle=col;}
+  x.font='bold 64px Arial,sans-serif';x.fillText(String(price),128,134); x.font='bold 24px Arial,sans-serif';x.fillStyle=aff?'#ffffff':'#9a8fc4';x.fillText(aff?'¡ABRIR!':'CRÉDITOS',128,164);
   w.sign.tex.needsUpdate=true; w.aff=aff?1:0;
 }
 function buildDoors(){
@@ -798,45 +806,35 @@ function buildDoors(){
   });
 }
 buildDoors(); grp.visible=false;
-V.price=()=>PRICES[Math.min(V.nOpen,3)]; V.makeLinks=makeLinks;
+V.price=()=>PRICES[Math.min(V.nOpen,3)];
 V.fdAt=(x,z)=>{const tx=Math.floor(x),tz=Math.floor(z);return inb(tx,tz)?fd[ti(tx,tz)]:-2;};   /* (pruebas) distancia de camino hasta el jugador */
 V.meshes=[wallM,floorM,ceilM]; V.edgeBox=eBox; V.cellsOf=eCells; V.connected=connected;
 
 /* ---------- ciclo de partida ---------- */
 V.reset=function(on){
-  V.on=!!on; V.tip=0; V.act=false; V.x0=-HX;V.x1=HX;V.z0=-HZ;V.z1=HZ; V.cr=0; V.nOpen=0; V.mazeOpen=false; V.links=[]; V.rt=0; V.phase=0; V.plan=null; V.near=-1; V.reshapes=0;
+  V.on=!!on; V.tip=0; V.act=false; V.x0=-HX;V.x1=HX;V.z0=-HZ;V.z1=HZ; V.cr=0; V.nOpen=0; V.rt=0; V.phase=0; V.plan=null; V.near=-1; V.reshapes=0;
   for(const g of V.ghosts)grp.remove(g); V.ghosts=[]; for(const s of V.slabs)grp.remove(s.m); V.slabs=[];
   solid.fill(1);trans.fill(0);dtile.fill(0);ht.fill(0);
   for(let tz=-22;tz<22;tz++)for(let tx=-22;tx<22;tx++){const i=ti(tx,tz);solid[i]=0;ht[i]=RH;}
-  V.exits=Math.random()<.5?[0,2]:[1,3]; V.nMax=V.exits.length;   /* solo 2 salidas, en lados opuestos: ESTE+OESTE o SUR+NORTE */
-  WING.forEach((w,j)=>{ clearMarks(w); w.open=false; w.door=false; w.exit=V.exits.includes(j); genMaze(w.E); pickRooms(w); for(let e=0;e<NE;e++)if(w.lock[e])w.E[e]=1; if(w.exit)setDoorTiles(w); });
-  V.rebuild(); grp.visible=V.on; for(const m of HALLW)m.visible=!V.on; V._a=-1; WING.forEach((w,j)=>{w.slab.visible=V.on&&w.exit;w.slab.position.y=0;w.dy=0;if(w.exit)drawSign(w,j);});
+  for(const w of WING){ clearMarks(w); w.open=false; genMaze(w.E); pickRooms(w); for(let e=0;e<NE;e++)if(w.lock[e])w.E[e]=1; for(let u=0;u<2;u++)for(let v=18;v<24;v++){const [tx,tz]=w.tl(u,v);dtile[ti(tx,tz)]=1;} }
+  V.pairs=Math.random()<.5?['NE','SO']:['NO','SE']; V.links=makeLinks().filter(l=>V.pairs.includes(l.k)); V.partner=[-1,-1,-1,-1]; V.joined=-1;
+  for(const l of V.links){V.partner[l.w[0]]=l.w[1];V.partner[l.w[1]]=l.w[0];}
+  V.rebuild(); grp.visible=V.on; for(const m of HALLW)m.visible=!V.on; V._a=-1; WING.forEach((w,j)=>{w.slab.visible=V.on;w.slab.position.y=0;w.dy=0;drawSign(w,j);});
 };
-V.openMaze=function(){   /* las 4 alas aparecen juntas, unidas por los pasillos de las esquinas */
-  if(V.mazeOpen)return; V.mazeOpen=true; V.act=true;
-  for(const w of WING){ w.open=true; carveMaze(w); addMarks(w); }
-  V.links=makeLinks(); carveLinks(V.links);
-  V.x0=-64;V.x1=64;V.z0=-64;V.z1=64; if(!V.rt)V.rt=RESHAPE;
-};
-V.openWing=function(i,free){   /* abre la puerta de la sala del ala i (la primera abre además todo el laberinto). free: pruebas, fuerza la puerta */
-  const w=WING[i]; if(!w||w.door||!V.on)return false;
-  if(!w.exit){ if(!free)return false; w.exit=true; V.nMax++; setDoorTiles(w); w.slab.visible=true; }
+V.openWing=function(i,free){
+  const w=WING[i]; if(!w||w.open||!V.on)return false;
   const price=V.price(); if(!free){ if(V.cr<price)return false; V.cr-=price; }
-  V.first=!V.mazeOpen; V.openMaze(); w.door=true; V.nOpen++; carveDoor(w);
-  w.dy=0.0001; V.rebuild(); for(let j=0;j<4;j++)if(WING[j].exit&&!WING[j].door)drawSign(WING[j],j);
+  w.open=true; V.nOpen++; carve(w); addMarks(w); V.act=true; V.joined=-1;
+  for(const l of V.links)if(!l.done&&l.w.includes(i)&&WING[l.w[0]].open&&WING[l.w[1]].open){carveLink(l);V.joined=l.w[0]===i?l.w[1]:l.w[0];}   /* la pareja ya estaba abierta: aparece el pasillo de unión */
+  if(w.k==='E')V.x1=64; else if(w.k==='O')V.x0=-64; else if(w.k==='S')V.z1=64; else V.z0=-64;
+  w.dy=0.0001; V.rebuild(); if(!V.rt)V.rt=RESHAPE; for(let j=0;j<4;j++)if(!WING[j].open)drawSign(WING[j],j);
   return true;
 };
-V.setExits=function(list){   /* (pruebas) elegir qué alas tienen puerta, antes de abrir el laberinto */
-  if(V.mazeOpen||!V.on)return false; V.exits=list.slice(); V.nMax=list.length;
-  WING.forEach((w,j)=>{ const was=w.exit; w.exit=list.includes(j); if(was&&!w.exit){for(let u=0;u<2;u++)for(let v=18;v<24;v++){const [tx,tz]=w.tl(u,v);dtile[ti(tx,tz)]=0;}} if(w.exit&&!was)setDoorTiles(w); w.slab.visible=w.exit; if(w.exit)drawSign(w,j); });
-  V.rebuild(); return true;
+V.guards=function(i){   /* unos cuantos enemigos aparecen en el ala recién abierta */
+  const w=WING[i], n=Math.max(0,Math.min(3+V.nOpen,maxEnemies()-enemies.length)); let k=0;
+  for(let t=0;t<40&&k<n;t++){ const r=w.rooms[(Math.random()*w.rooms.length)|0], u=PIT*r.a+2+rand(1.5,ROOM-1.5), v=PIT*r.b+2+rand(1.5,ROOM-1.5), q=w.wp(u,v); if(V.sp(q[0],q[1]))continue; spawnEnemy(pickType(domBand()),q[0],q[1]); k++; }
 };
-V.guards=function(first){   /* unos cuantos enemigos aparecen en las salas (minizonas) del laberinto */
-  const rooms=[]; for(const w of WING)if(w.open)for(const r of w.rooms)rooms.push([w,r]); if(!rooms.length)return; shuffle(rooms);
-  const n=Math.max(0,Math.min(first?10:4,maxEnemies()-enemies.length)); let k=0;
-  for(let t=0;t<80&&k<n;t++){ const [w,r]=rooms[t%rooms.length], u=PIT*r.a+2+rand(1.5,ROOM-1.5), v=PIT*r.b+2+rand(1.5,ROOM-1.5), q=w.wp(u,v); if(V.sp(q[0],q[1]))continue; spawnEnemy(pickType(domBand()),q[0],q[1]); k++; }
-};
-V.earn=function(n){ if(!V.on)return; const b=V.cr; V.cr+=n; const pr=V.price(); if(V.nOpen<V.nMax&&b<pr&&V.cr>=pr){ banner('¡PUEDES ABRIR UNA PUERTA!','#7dff5a','acércate a una de las 2 puertas de la sala · '+pr+' CR'); A.chime([523,784,1047]); } };
+V.earn=function(n){ if(!V.on)return; const b=V.cr; V.cr+=n; const pr=V.price(); if(V.nOpen<4&&b<pr&&V.cr>=pr){ banner('¡PUEDES ABRIR UNA PUERTA!','#7dff5a','acércate a una puerta de la sala · '+pr+' CR'); A.chime([523,784,1047]); } };
 
 /* ---------- reordenar el laberinto ---------- */
 function entsIn(box,m){ if(P.x>box.x0-m&&P.x<box.x1+m&&P.z>box.z0-m&&P.z<box.z1+m)return true; for(const e of enemies)if(!e.dead&&e.T.kind!=='dragon'){const p=e.g.position;if(p.x>box.x0-m-e.r&&p.x<box.x1+m+e.r&&p.z>box.z0-m-e.r&&p.z<box.z1+m+e.r)return true;} return false; }
@@ -882,7 +880,7 @@ function endMove(){
 }
 V.tick=function(dt){
   if(!V.on)return;
-  if(!V.tip&&V.nOpen===0&&S.running&&S.t>7){V.tip=1;banner('CRÉDITOS (CR)','#ffe14d','mata enemigos, junta '+V.price()+' CR y abre una de las 2 puertas de la sala');}
+  if(!V.tip&&V.nOpen===0&&S.running&&S.t>7){V.tip=1;banner('CRÉDITOS (CR)','#ffe14d','mata enemigos, junta '+V.price()+' CR y abre una puerta de la sala');}
   if(V.act){
     V.flow(P.x,P.z);
     if(V.phase===0){ V.rt-=dt; if(V.rt<=0)warn(); }
@@ -890,14 +888,43 @@ V.tick=function(dt){
     else { V.at-=dt; const k=clamp(1-V.at/ANIM,0,1), ek=k*k*(3-2*k); for(const s of V.slabs){ s.m.position.y=-WH*(s.k?1-ek:ek)-(s.k?0:.02); } if(V.at<=0)endMove(); }
   }
   /* puertas: cercanía, avisos y animación de apertura */
-  let near=-1,bd=7.5; for(let i=0;i<4;i++){const w=WING[i]; if(!w.exit)continue; if(w.door){ if(w.dy>0&&w.dy<1){w.dy=Math.min(1,w.dy+dt/.9);w.slab.position.y=(DH+.2)*(w.dy*w.dy*(3-2*w.dy)); if(w.dy>=1)w.slab.visible=false;} continue; } const c=w.wp(.3,21),d=Math.hypot(c[0]-P.x,c[1]-P.z); if(d<bd&&S.running){bd=d;near=i;}}
+  let near=-1,bd=7.5; for(let i=0;i<4;i++){const w=WING[i]; if(w.open){ if(w.dy>0&&w.dy<1){w.dy=Math.min(1,w.dy+dt/.9);w.slab.position.y=(DH+.2)*(w.dy*w.dy*(3-2*w.dy)); if(w.dy>=1)w.slab.visible=false;} continue; } const c=w.wp(.3,21),d=Math.hypot(c[0]-P.x,c[1]-P.z); if(d<bd&&S.running){bd=d;near=i;}}
   V.near=near;
-  { const a=V.cr>=V.price()?1:0; if(V._a!==a){V._a=a; for(let j=0;j<4;j++)if(WING[j].exit&&!WING[j].door)drawSign(WING[j],j);} }
+  { const a=V.cr>=V.price()?1:0; if(V._a!==a){V._a=a; for(let j=0;j<4;j++)if(!WING[j].open)drawSign(WING[j],j);} }
+};
+/* ---------- mapa: plano del laberinto abierto, en vivo ---------- */
+const mapC=document.createElement('canvas'); let mapI=null,mapW=0,mapH=0;
+V.drawMap=function(cv,px,pz,yaw,ens){
+  const g=cv.getContext('2d'),CW=cv.width,CH=cv.height;
+  const tx0=Math.floor(V.x0)-1,tx1=Math.ceil(V.x1)+1,tz0=Math.floor(V.z0)-1,tz1=Math.ceil(V.z1)+1,nw=tx1-tx0,nh=tz1-tz0;
+  if(mapW!==nw||mapH!==nh){mapC.width=mapW=nw;mapC.height=mapH=nh;mapI=mapC.getContext('2d').createImageData(nw,nh);}
+  const d=mapI.data; d.fill(0); const mk=new Uint8Array(nw*nh);   /* 1 minizona · 2 unión · 3 puerta cerrada · 4 puerta abierta */
+  const put=(tx,tz,v)=>{const x=tx-tx0,z=tz-tz0; if(x>=0&&z>=0&&x<nw&&z<nh)mk[z*nw+x]=v;};
+  for(const w of WING){ if(w.open)for(const r of w.rooms)roomTiles(w,r,(tx,tz)=>put(tx,tz,1)); for(let u=0;u<2;u++)for(let v=18;v<24;v++){const [tx,tz]=w.tl(u,v);put(tx,tz,w.open?4:3);} }
+  for(const l of V.links)if(l.done)for(const r of l.R)for(let z=r[2];z<=r[3];z++)for(let x=r[0];x<=r[1];x++)put(x,z,2);
+  const op=(tx,tz)=>inb(tx,tz)&&!solid[ti(tx,tz)];
+  for(let tz=tz0;tz<tz1;tz++)for(let tx=tx0;tx<tx1;tx++){
+    const o=((tz-tz0)*nw+(tx-tx0))*4, m=mk[(tz-tz0)*nw+(tx-tx0)]; let c=null;
+    if(op(tx,tz)){ c=m===1?[30,120,150]:m===2?[120,80,185]:m===4?[70,150,80]:isRoom(tx,tz)?[52,76,128]:[30,48,88]; }
+    else if(m===3)c=[255,216,74];
+    else if(op(tx+1,tz)||op(tx-1,tz)||op(tx,tz+1)||op(tx,tz-1)||op(tx+1,tz+1)||op(tx-1,tz-1)||op(tx+1,tz-1)||op(tx-1,tz+1))c=[176,48,140];
+    if(c){d[o]=c[0];d[o+1]=c[1];d[o+2]=c[2];d[o+3]=255;}
+  }
+  mapC.getContext('2d').putImageData(mapI,0,0);
+  const sc=Math.min(CW/nw,CH/nh),ox=(CW-nw*sc)/2,oy=(CH-nh*sc)/2,X=x=>(x-tx0)*sc+ox,Y=z=>(z-tz0)*sc+oy;
+  g.clearRect(0,0,CW,CH); g.imageSmoothingEnabled=false; g.drawImage(mapC,ox,oy,nw*sc,nh*sc);
+  if(V.phase===1&&V.plan)for(const p of V.plan){const w=WING[p.i]; for(const e of p.closed){const b=eBox(w,e);g.fillStyle='rgba(255,60,80,.75)';g.fillRect(X(b.x0),Y(b.z0),(b.x1-b.x0)*sc,(b.z1-b.z0)*sc);} for(const e of p.opened){const b=eBox(w,e);g.fillStyle='rgba(90,255,110,.7)';g.fillRect(X(b.x0),Y(b.z0),(b.x1-b.x0)*sc,(b.z1-b.z0)*sc);}}
+  const fs=Math.max(10,Math.min(16,sc*3.2)); g.font='bold '+fs+'px Arial,sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+  const pr=V.price(); WING.forEach((w,j)=>{ if(w.open)return; const c=w.wp(-3.4,21),t=w.k+' '+pr; const wd=g.measureText(t).width+8, lx=Math.max(wd/2+2,Math.min(CW-wd/2-2,X(c[0]))), ly=Math.max(fs,Math.min(CH-fs-26,Y(c[1]))); g.fillStyle='rgba(8,4,20,.82)'; g.fillRect(lx-wd/2,ly-fs*.7,wd,fs*1.4); g.fillStyle=V.cr>=pr?'#7dff5a':'#ffd84a'; g.fillText(t,lx,ly); });
+  g.fillStyle='#ff3b5c'; for(const e of ens){ if(e.dead)continue; const p=e.g.position,r=Math.max(1.8,Math.min(5,(e.r||.5)*sc*.9)); g.beginPath(); g.arc(X(p.x),Y(p.z),r,0,7); g.fill(); }
+  const ac=Math.max(6,Math.min(11,sc*2.6)),fx=-Math.sin(yaw),fz=-Math.cos(yaw),qx=X(px),qy=Y(pz);
+  g.beginPath(); g.moveTo(qx+fx*ac,qy+fz*ac); g.lineTo(qx-fx*ac*.6-fz*ac*.7,qy-fz*ac*.6+fx*ac*.7); g.lineTo(qx-fx*ac*.6+fz*ac*.7,qy-fz*ac*.6-fx*ac*.7); g.closePath(); g.fillStyle='#ffe14d'; g.fill(); g.lineWidth=1.5; g.strokeStyle='#201000'; g.stroke();
+  if(V.act){ const t=V.phase===0?'CAMBIA EN '+Math.max(0,Math.ceil(V.rt))+' s':'¡EL LABERINTO CAMBIA!'; g.font='bold 13px Arial,sans-serif'; g.textAlign='center'; const wd=g.measureText(t).width+14; g.fillStyle='rgba(8,4,20,.85)'; g.fillRect(CW/2-wd/2,CH-24,wd,19); g.fillStyle=V.phase===0?(V.rt<10?'#ffb347':'#d9d2ff'):'#ff6b8a'; g.fillText(t,CW/2,CH-14); }
 };
 V.try=function(){
   if(!V.on||V.near<0||!S.running||S.over)return false; const w=WING[V.near],price=V.price();
   if(V.cr<price){ banner('FALTAN '+(price-V.cr)+' CRÉDITOS','#ff6b8a','mata enemigos para ganar más'); A.blip(200,120,.2,.3,'sawtooth','no'); return false; }
-  const i=V.near; if(V.openWing(i)){ const f=V.first; banner(f?'PUERTA '+w.n+' ABIERTA':'SEGUNDA SALIDA ABIERTA','#7dff5a',f?'las 4 alas del laberinto están unidas · ¡cuidado!':'ya hay 2 caminos al laberinto'); A.chime([392,523,659,784]); A.boom(true); S.shake=Math.max(S.shake,.6); V.guards(f); return true; } return false;
+  const i=V.near; if(V.openWing(i)){ const pj=V.partner[i]; banner('PUERTA '+w.n+' ABIERTA','#7dff5a',V.joined>=0?'pasillo de unión abierto con '+WING[V.joined].n+' · ¡cuidado!':(pj>=0?'se unirá con '+WING[pj].n+' cuando abras su puerta':'el laberinto se extiende · ¡cuidado!')); A.chime([392,523,659,784]); A.boom(true); S.shake=Math.max(S.shake,.6); V.guards(i); return true; } return false;
 };
 return V;
 })();
@@ -1710,6 +1737,11 @@ const ab1=$('ab1'), ab2=$('ab2');
 ['ab1','ab2'].forEach((id,k)=>$(id).addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();k?useUlt():useAbility();}));
 $('dodge').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();doDodge();});
 $('doorBtn').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();W.try();});
+let mapOpen=false,mapT=0;
+function setMap(v){mapOpen=!!v;$('mapBtn').classList.toggle('on',mapOpen);$('mapBox').classList.toggle('on',mapOpen&&W.on&&S.running);mapT=0;}
+function toggleMap(){if(W.on&&S.running)setMap(!mapOpen);}
+function updMap(){const show=W.on&&S.running;$('mapBtn').classList.toggle('show',show);if(!show){if(mapOpen)setMap(false);return;}if(!mapOpen)return;const t=performance.now();if(t-mapT<200)return;mapT=t;$('mapBox').classList.add('on');W.drawMap($('mapCv'),P.x,P.z,S.yaw,enemies);}
+$('mapBtn').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();toggleMap();});
 function setupChar(){
   const c=CHARS[S.char]; ab1.style.setProperty('--ac',c.col); ab2.style.setProperty('--ac',c.col); ab1.firstChild.textContent=c.a.name; ab2.firstChild.textContent=c.u.name;
 }
@@ -1827,7 +1859,7 @@ function pickTick(rdt){S.pickT-=rdt; upBar.style.transform='scaleX('+clamp(S.pic
 
 /* ================= Entrada ================= */
 const joy={x:0,y:0,id:null,cx:0,cy:0,R:48}, jz=$('joyzone'), jb=$('joybase'), kn=$('knob');
-const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=1;if(e.key.toLowerCase()==='r')W.try();if(e.key===' ')useAbility();if(e.key.toLowerCase()==='e')useUlt();if(e.key==='Shift'||e.key.toLowerCase()==='q')doDodge();});addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=0;});
+const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=1;if(e.key.toLowerCase()==='r')W.try();if(e.key.toLowerCase()==='m')toggleMap();if(e.key===' ')useAbility();if(e.key.toLowerCase()==='e')useUlt();if(e.key==='Shift'||e.key.toLowerCase()==='q')doDodge();});addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=0;});
 function joyX(){let x=joy.x+(keys.d?1:0)-(keys.a?1:0);x=clamp(x,-1,1);return Math.abs(x)<.1?0:x;}
 function joyY(){let y=joy.y+(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0);y=clamp(y,-1,1);return Math.abs(y)<.12?0:y;}
 jz.addEventListener('pointerdown',e=>{e.preventDefault();if(joy.id!==null)return;joy.id=e.pointerId;try{jz.setPointerCapture(e.pointerId)}catch(_){}const r=jz.getBoundingClientRect();joy.cx=e.clientX;joy.cy=e.clientY;jb.style.left=(e.clientX-r.left)+'px';jb.style.top=(e.clientY-r.top)+'px';jb.classList.add('act');});
@@ -2208,6 +2240,7 @@ function updHud(){ if(fansDirty){fansDirty=false;renderFans();}
   upd('sc',S.score,v=>$('score').textContent=v.toLocaleString('es'));
   upd('di',S.level+'|'+S.kills+'|'+(W.on?W.cr+'|'+(W.nOpen<W.nMax&&W.cr>=W.price()?1:0):-1),()=>{const d=$('dist');d.textContent='NIVEL '+S.level+' · '+S.kills+' BAJAS';if(W.on){const c=document.createElement('span');c.className='cr'+(W.nOpen<W.nMax&&W.cr>=W.price()?' ok':'');c.textContent=W.cr+' CR';d.appendChild(c);}});
   upd('cb',S.combo,v=>$('combo').textContent=v>1?'x'+v:'');
+  updMap();
   { const k=W.on?W.nOpen+'|'+W.near+'|'+(W.cr>=W.price()?1:0)+'|'+(W.price()-W.cr)+'|'+S.running:'off'; upd('wk',k,()=>{ const db=$('doorBtn');
       const nr=W.on&&W.near>=0&&W.nOpen<W.nMax&&S.running; db.classList.toggle('on',nr); if(nr){const ok=W.cr>=W.price(); db.classList.toggle('no',!ok); db.textContent=ok?'ABRIR PUERTA '+W.wings[W.near].n+' · '+W.price()+' CR'+(matchMedia('(pointer:fine)').matches?' [R]':''):'PUERTA '+W.wings[W.near].n+' · FALTAN '+(W.price()-W.cr)+' CR';} }); }
   upd('gp',Math.round(S.diff*100),v=>{const g=$('gapFill');g.style.transform='scaleX('+clamp(v/100,0,1)+')';g.style.background=v>70?'var(--bad)':v>40?'var(--c3)':'var(--ok)';});
