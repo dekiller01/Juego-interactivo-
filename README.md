@@ -154,11 +154,11 @@ El botón atrás cierra la app. Cada cambio del juego (`index.html`) requiere co
 
 | Modo | Qué hace |
 |---|---|
-| `AUTO` | Mide los FPS y baja o sube solo la resolución y los detalles (5 niveles) para mantener fluidez. En pantallas de 90/120 Hz limita a ~60 FPS. |
-| `AHORRO` | Límite de 30 FPS y menos detalles. Úsalo si el teléfono se calienta transmitiendo. |
-| `MÁXIMO` | Siempre la mejor calidad, sin bajar nada automáticamente. |
+| `AUTO` | Mide los FPS y baja o sube solo la resolución y los detalles (6 niveles, de 100 % a 45 % de resolución) para llegar a 60 FPS. |
+| `AHORRO` | Objetivo 30 FPS. Empieza en el nivel 2 (75 % de resolución, sin cascarones) y **baja solo hasta el nivel 5** si el teléfono no llega; si le sobra, vuelve a subir (nunca por encima del nivel 2). Ignora la «alta resolución». |
+| `MÁXIMO` | La mejor calidad mientras vaya fluido. Red de seguridad: si cae por debajo de 30 FPS durante 3 s baja un escalón (como mucho hasta el nivel 2) y vuelve a subir solo cuando le sobra. |
 
-⚙ → **MOSTRAR FPS** pone arriba a la izquierda `FPS · RES · nivel · dib`. Si algo sigue lento, esos números ayudan a ajustarlo.
+⚙ → **MOSTRAR FPS** pone arriba a la izquierda `FPS · RES · N nivel · dib · k△ · JS ms` (v30). **JS ms** es lo que tarda el procesador en preparar cada cuadro: si los FPS son bajos pero JS es pequeño (menos de ~8 ms), el límite es la tarjeta gráfica; si JS es grande, es el procesador. Dime esos números y se ajusta mejor.
 Los efectos de pantalla (golpe, vida baja, escudo, velocidad) ahora se dibujan en una sola pasada dentro del propio juego.
 
 ## Controles y curación
@@ -362,6 +362,30 @@ Cada pareja se une por **un pasillo de unión** (6 m de ancho, por la esquina, c
 
 - **Pruebas:** `nbr/t84.js` (18 comprobaciones: 4 puertas siempre, parejas simétricas y de las 2 formas, precios 300/600/1000/1500, el pasillo solo aparece al abrir la 2.ª ala de la pareja en cualquier orden, con las 4 abiertas hay exactamente 2 bloques unidos fuera de la sala, las esquinas solo tienen los 2 pasillos, 30 reordenados con las uniones abiertas, botón MAPA con el dedo, el plano no tapa los toques, contenido del plano, sin botón con el laberinto apagado), más `t73.js`, `t74.js`, `t76.js`, `t79.js` y las de siempre; capturas en `mapa_v29.png`.
 - **Honesto:** no se ha probado en teléfonos reales. El plano muestra todo lo abierto (no hay niebla de «lo ya explorado»). Si quieres, el siguiente paso es un minimapa pequeño siempre visible, o que el mapa solo muestre lo que ya has recorrido.
+- **Para actualizar:** sube solo `index.html` (`perfiles.js`, `salas.js` y `server.js` no cambian), espera a que Render termine de desplegar y vuelve a ejecutar «Construir APK» si usas la app.
+
+## Novedades v30: rendimiento (FPS que bajaban a 15–20)
+
+**Qué se cambió (sin cambiar el aspecto ni el juego):**
+- **Enemigos lejanos = 1 dibujo.** Un humanoide eran 6–8 mallas (torso, cabeza, 2 brazos, 2 piernas, cascarón, ojos). Más allá de 13 m (20 m en MÁXIMO) se dibuja una sola malla fusionada con la misma forma y color; al acercarse recupera las piezas animadas (con histéresis, sin parpadeos). Los ojos solo se dibujan cerca. Jefe y dragón no se simplifican.
+- **Enemigos tras una pared no se dibujan** (laberinto): si ninguno de 3 rayos (centro y los lados) llega a ellos, quedan ocultos; a menos de 7 m siempre se ven. La lógica (IA, disparos, mapa) no cambia.
+- **Laberinto:** las marcas de las minizonas pasan de 2 mallas transparentes a 1 por sala y las que están a más de 46 m no se dibujan. El mapa guarda su capa estática y solo la repinta cuando cambia el laberinto (antes ~1,2 ms en ordenador cada 0,2 s con el mapa abierto).
+- **Efectos de pantalla:** el pulso del ritmo, el escudo y el clímax solo tocan los bordes, así que ahora usan un marco de 84 px en vez de cubrir toda la pantalla (la mitad de píxeles en un móvil apaisado). Daño, vida baja, flash y líneas de velocidad siguen a pantalla completa.
+- **Calidad adaptativa en todos los modos** (antes AHORRO era fijo y MÁXIMO también): 6 niveles (resolución 100/85/75/65/55/45 %, partículas, cascarones, distancia de LOD, frecuencia del HUD). Ver la tabla de arriba. Los niveles que elige AHORRO/MÁXIMO por sí solos no se guardan; solo AUTO recuerda su último nivel.
+- **AHORRO ya no usa «alta resolución»** (antes con ese ajuste activo dibujaba a 1,5× la pantalla incluso en AHORRO).
+- Con la calidad en nivel 3 o menos el HUD (marcadores y ecualizador) se actualiza la mitad de veces.
+
+**Medido (ordenador, GPU por software; 28 enemigos, mediana de 3 mediciones, misma máquina, v29 → v30):**
+
+| | dibujos | tiempo de dibujado AHORRO | tiempo de dibujado MÁXIMO |
+|---|---|---|---|
+| laberinto | 115 → 62 (−46 %) | 17,1 → 13,3 ms (−22 %) | 32,5 → 25,5 ms (−22 %) |
+| arena, enemigos a 18–38 m | 120 → 74 (−38 %) | no comparable: la calidad adaptativa de la v30 bajó un nivel durante la medición | idem |
+
+Mallas de enemigos dibujadas en el laberinto: ~158 → 33–41 (según dónde caigan). No hay fugas: tras 1200 enemigos creados y destruidos las geometrías, programas y memoria se mantienen estables.
+
+- **Pruebas nuevas:** `nbr/t97.js` (19 comprobaciones: LOD con los 7 tipos de humanoide y mismo volumen que las piezas, histéresis, marco/pasada completa de efectos, controlador adaptativo de los 3 modos con 15/20/25/30/45/60 FPS simulados, enemigos tras paredes ocultos y visibles coherentes con la línea de visión, jefe y dragón nunca ocultos, marcas fusionadas y ocultas a distancia, mapa en caché), `t93.js`/`t95.js`/`t98.js` (mediciones), `t96.js` (fugas). Pasan también `t84` (18), `t73` (16), `t74` (7), `t76`, `t79` (6), `t67` (16), `t60` (11), `t15`, `t41`.
+- **Honesto:** no se ha probado en teléfonos reales y la GPU del probador es por software, así que los milisegundos no se pueden trasladar tal cual a tu móvil; lo fiable son los **dibujos (−40 a −46 %)** y que ahora AHORRO y MÁXIMO bajan solos de calidad si no llegan. La lógica y el HUD corrían a 60 FPS incluso con la CPU frenada ×4: el cuello de botella es el dibujado 3D (número de dibujos y píxeles), que es lo que se ha atacado. Si tu móvil sigue yendo mal, activa ⚙ → MOSTRAR FPS y dime los números de `JS ms` y el nivel.
 - **Para actualizar:** sube solo `index.html` (`perfiles.js`, `salas.js` y `server.js` no cambian), espera a que Render termine de desplegar y vuelve a ejecutar «Construir APK» si usas la app.
 
 ## Cómo seguir añadiendo cosas sin que se ponga pesado
