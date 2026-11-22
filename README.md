@@ -388,6 +388,28 @@ Mallas de enemigos dibujadas en el laberinto: ~158 → 33–41 (según dónde ca
 - **Honesto:** no se ha probado en teléfonos reales y la GPU del probador es por software, así que los milisegundos no se pueden trasladar tal cual a tu móvil; lo fiable son los **dibujos (−40 a −46 %)** y que ahora AHORRO y MÁXIMO bajan solos de calidad si no llegan. La lógica y el HUD corrían a 60 FPS incluso con la CPU frenada ×4: el cuello de botella es el dibujado 3D (número de dibujos y píxeles), que es lo que se ha atacado. Si tu móvil sigue yendo mal, activa ⚙ → MOSTRAR FPS y dime los números de `JS ms` y el nivel.
 - **Para actualizar:** sube solo `index.html` (`perfiles.js`, `salas.js` y `server.js` no cambian), espera a que Render termine de desplegar y vuelve a ejecutar «Construir APK» si usas la app.
 
+## Novedades v31: el rendimiento de la v30, también en multijugador
+
+**Qué ya valía en multijugador desde la v30** (comparte el mismo código): los enemigos humanoides lejanos se dibujan con 1 malla (en el anfitrión y en los fantasmas del invitado), la calidad adaptativa de AHORRO/MÁXIMO/AUTO, el marco de efectos de borde, el HUD menos frecuente en calidad baja y «AHORRO sin alta resolución». Lo de «enemigos tras paredes» solo aplica al laberinto, que es de un solo jugador.
+
+**Nuevo en la v31 (lo que faltaba):**
+- **Los compañeros también se simplifican a distancia.** Un avatar eran 6 piezas del héroe + anillo + nombre + 2 barras. Más allá de la distancia de LOD (13 m en AHORRO, 20 m en MÁXIMO) se dibuja una sola malla del héroe **con el brazo ya en pose de apuntar** (idéntico a las piezas, comprobado en una captura lado a lado) y no se animan las piernas ni los brazos.
+- **La barra de vida del compañero se oculta a más de 30 m** (el nombre y el anillo de color se siguen viendo para localizarlo). Al acercarse vuelve todo.
+- Funciona igual en **EN EQUIPO** y en **TODOS CONTRA TODOS**, y para el anfitrión y los invitados.
+
+**Medido (3 jugadores reales: anfitrión + 2 invitados, ~40 enemigos, un compañero a 42 m y otro a 4 m; GPU por software con 3 navegadores a la vez; calidad fijada en el nivel 2; vista del invitado):**
+
+| | v29 | v30 | v31 |
+|---|---|---|---|
+| dibujos | 274 | 175 | 124 (−55 % respecto a la v29) |
+| tiempo de dibujado | 103 ms | 86 ms | 75 ms |
+
+(la diferencia v30 → v31 incluye algo de variación de dónde caen los enemigos en cada medición). Tráfico: un invitado recibe 12–19 KB/s con ~40 enemigos, razonable para datos móviles.
+
+- **Pruebas:** `nbr/t100.js` (16 comprobaciones con 3 jugadores reales y `PVP=1 node t100.js` para todos contra todos: avatar lejano en 1 malla sin barra, cercano con 6 piezas y barra, el invitado ve igual, LOD coherente con la distancia en anfitrión e invitado, al acercarse vuelve a las piezas, el brazo apuntando está en la malla LOD, tráfico razonable, sin errores), `t101.js` (comparativa de dibujos entre versiones), `t102.js`/`t103.js` (capturas). Siguen pasando `t97` (19), `t60` (11), `t67` (16), `t74`, `t73`, `t79`, `t84`, `t76`.
+- **Honesto:** no se ha probado con móviles reales ni con la red real de Render; el probador usa GPU por software, así que los milisegundos no se trasladan tal cual. Lo fiable son los dibujos y que el juego ahora baja de calidad solo si no llega a los FPS del modo. En multijugador el anfitrión hace además toda la simulación para todos: si el anfitrión tiene un móvil flojo, que use AHORRO.
+- **Para actualizar:** sube solo `index.html` (`perfiles.js`, `salas.js` y `server.js` no cambian), espera a que Render termine de desplegar y vuelve a ejecutar «Construir APK». **Todos los jugadores** deben tener la versión nueva (si uno tiene la anterior sigue funcionando, solo que sin esta mejora en su pantalla).
+
 ## Cómo seguir añadiendo cosas sin que se ponga pesado
 
 Reglas que se siguen en cada mejora: reutilizar geometrías y materiales (nunca crear uno nuevo por enemigo o disparo), reutilizar objetos en vez de
