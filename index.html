@@ -428,6 +428,7 @@ body.play #mates{display:flex}
       <div class="pst">Código de la sala</div>
       <div class="big" id="mpCodeBig">----</div>
       <div class="seg2 c2" id="mpModo"><button data-v="coop">🤝 EN EQUIPO</button><button data-v="pvp">⚔ TODOS CONTRA TODOS</button></div>
+      <div class="seg2" id="mpLabBox"><button id="mpLab" style="padding:7px 4px;font-size:11px">🧩 LABERINTO: SÍ</button></div>
       <div class="prow"><button class="sm" id="mpShare">COMPARTIR ENLACE</button><button class="sm" id="mpCopy">COPIAR ENLACE</button></div>
       <div id="mpList"></div>
       <div class="pst" id="mpHint"></div>
@@ -605,7 +606,7 @@ const HALLW=[];
 const W=(()=>{
 const N=128,OFF=64,WH=7,DH=4.2,RH=HH,PRICES=[300,600,1000,1500],RESHAPE=70,WARN=5,ANIM=1.1,PIT=8,CN=5,NE=40;
 const solid=new Uint8Array(N*N), trans=new Uint8Array(N*N), dtile=new Uint8Array(N*N), ht=new Float32Array(N*N);
-const fd=new Int16Array(N*N), qu=new Int32Array(N*N);
+const FD=[0,1,2,3].map(()=>new Int16Array(N*N)), fd=FD[0], qu=new Int32Array(N*N), fT=[-1,-1,-1,-1], fR=[-1,-1,-1,-1];
 const ti=(tx,tz)=>(tz+OFF)*N+tx+OFF, inb=(tx,tz)=>tx>=-OFF&&tx<OFF&&tz>=-OFF&&tz<OFF;
 const sol=(tx,tz)=>inb(tx,tz)?solid[ti(tx,tz)]===1:true;
 const isRoom=(tx,tz)=>tx>=-22&&tx<22&&tz>=-22&&tz<22;
@@ -616,7 +617,7 @@ const WING=[
  {k:'O',n:'OESTE', tl:(u,v)=>[-23-u,-21+v], wp:(u,v)=>[-22-u,-21+v], ax:'x'},
  {k:'N',n:'NORTE', tl:(u,v)=>[-21+v,-23-u], wp:(u,v)=>[-21+v,-22-u], ax:'z'}];
 for(const w of WING){w.E=new Uint8Array(NE);w.lock=new Uint8Array(NE);w.rooms=[];w.marks=[];w.open=false;w.sign=null;w.slab=null;w.aff=-1;w.dy=0;}
-const V={on:false,act:false,x0:-HX,x1:HX,z0:-HZ,z1:HZ,cr:0,nOpen:0,nMax:4,pairs:[],partner:[-1,-1,-1,-1],links:[],joined:-1,wings:WING,PRICES,WH,DH,N,OFF,
+const V={net:null,free:false,rsT:RESHAPE,on:false,act:false,x0:-HX,x1:HX,z0:-HZ,z1:HZ,cr:0,nOpen:0,nMax:4,pairs:[],partner:[-1,-1,-1,-1],links:[],joined:-1,wings:WING,PRICES,WH,DH,N,OFF,
   rt:0,phase:0,plan:null,ghosts:[],slabs:[],at:0,reshapes:0,near:-1,dirty:true,vis:true};
 
 /* ---------- laberinto: celdas 0..24 (a·5+b), aristas 0..39 ---------- */
@@ -624,17 +625,19 @@ function eCells(e){ if(e<20){const a=(e/5)|0,b=e%5;return [a*5+b,(a+1)*5+b];} co
 function eRect(e){ if(e<20){const a=(e/5)|0,b=e%5,u0=PIT*(a+1),v0=PIT*b+2;return [u0,u0+2,v0,v0+6];} const q=e-20,a=(q/4)|0,b=q%4,u0=PIT*a+2,v0=PIT*(b+1);return [u0,u0+6,v0,v0+2]; }
 const NB=[]; for(let c=0;c<25;c++){const a=(c/5)|0,b=c%5,l=[]; if(a<4)l.push([c+5,a*5+b]); if(a>0)l.push([c-5,(a-1)*5+b]); if(b<4)l.push([c+1,20+a*4+b]); if(b>0)l.push([c-1,20+a*4+b-1]); NB.push(l);}
 function connected(E){ const seen=new Uint8Array(25),st=[2];seen[2]=1;let n=1; while(st.length){const c=st.pop();for(const [d,e] of NB[c])if(E[e]&&!seen[d]){seen[d]=1;n++;st.push(d);}} return n===25; }
-function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;const t=a[i];a[i]=a[j];a[j]=t;}return a;}
+let rnd=Math.random;   /* v32: en multijugador todos generan el laberinto con la misma semilla */
+function mkRng(sd){ let a=(sd|0)||1; return ()=>{ a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(rnd()*(i+1))|0;const t=a[i];a[i]=a[j];a[j]=t;}return a;}
 function genMaze(E){
   E.fill(0); const seen=new Uint8Array(25),st=[2];seen[2]=1;
-  while(st.length){const c=st[st.length-1],opts=NB[c].filter(x=>!seen[x[0]]); if(!opts.length){st.pop();continue;} const [d,e]=opts[(Math.random()*opts.length)|0]; E[e]=1;seen[d]=1;st.push(d);}
+  while(st.length){const c=st[st.length-1],opts=NB[c].filter(x=>!seen[x[0]]); if(!opts.length){st.pop();continue;} const [d,e]=opts[(rnd()*opts.length)|0]; E[e]=1;seen[d]=1;st.push(d);}
   const cl=shuffle([...Array(NE).keys()].filter(e=>!E[e])); for(let i=0;i<4&&i<cl.length;i++)E[cl[i]]=1;   /* algunos atajos: no es un árbol perfecto */
 }
 const ROOM=14;   /* minizonas: 2×2 celdas fundidas en una sala abierta de 14×14 m con 2 columnas de cobertura */
 function pickRooms(w){
   w.rooms=[]; w.lock.fill(0);
-  const ba=Math.random()<.5?0:3, A={a:1+((Math.random()*2)|0),b:ba}, B={a:2+((Math.random()*2)|0),b:3-ba};
-  for(const r of [A,B]){ r.t=(Math.random()*2)|0; w.rooms.push(r); const a=r.a,b=r.b; for(const e of [a*5+b,a*5+b+1,20+a*4+b,20+(a+1)*4+b])w.lock[e]=1; }
+  const ba=rnd()<.5?0:3, A={a:1+((rnd()*2)|0),b:ba}, B={a:2+((rnd()*2)|0),b:3-ba};
+  for(const r of [A,B]){ r.t=(rnd()*2)|0; w.rooms.push(r); const a=r.a,b=r.b; for(const e of [a*5+b,a*5+b+1,20+a*4+b,20+(a+1)*4+b])w.lock[e]=1; }
 }
 function roomTiles(w,r,fn){ const u0=PIT*r.a+2,v0=PIT*r.b+2; for(let u=u0;u<u0+ROOM;u++)for(let v=v0;v<v0+ROOM;v++){const [tx,tz]=w.tl(u,v);fn(tx,tz,u-u0,v-v0);} }
 function carveRoom(w,r){
@@ -650,7 +653,7 @@ function eBox(w,e){ const [u0,u1,v0,v1]=eRect(e),a=w.wp(u0,v0),b=w.wp(u1,v1); re
    por UN pasillo, que aparece cuando las dos alas de la pareja están abiertas. Son fijos: el reordenado nunca los toca (la profundidad 0..2 es al azar).
    Rectángulos [x0,x1,z0,z1] en baldosas (inclusive); w = índices de las alas (E0 S1 O2 N3) */
 function makeLinks(){
-  const r=()=>(Math.random()*3)|0; let p,q;
+  const r=()=>(rnd()*3)|0; let p,q;
   const L=[]; p=r();q=r(); L.push({k:'NE',w:[3,0],R:[[19,29+8*q,-30-8*p,-25-8*p],[24+8*q,29+8*q,-30-8*p,-20]]});   /* N(p) ↔ E(q) */
   p=r();q=r(); L.push({k:'SE',w:[0,1],R:[[19,29+8*p,24+8*q,29+8*q],[24+8*p,29+8*p,19,29+8*q]]});                      /* E(p) ↔ S(q) */
   p=r();q=r(); L.push({k:'SO',w:[1,2],R:[[-30-8*q,-20,24+8*p,29+8*p],[-30-8*q,-25-8*q,19,29+8*p]]});                  /* S(p) ↔ O(q) */
@@ -723,32 +726,41 @@ V.snap=function(x,z){   /* punto libre más cercano (centro de baldosa) */
   for(let r=1;r<=14;r++){let bd=1e9,bx=null,bz=null; for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){ if(Math.max(Math.abs(dx),Math.abs(dz))!==r)continue; const tx=cx+dx,tz=cz+dz; if(sol(tx,tz))continue; const d=(tx+.5-x)**2+(tz+.5-z)**2; if(d<bd){bd=d;bx=tx;bz=tz;} } if(bx!==null)return {x:bx+.5,z:bz+.5};}
   return {x:P.x,z:P.z};
 };
-V.rndSpot=function(minD){   /* hueco al azar (sala o alas abiertas) lejos del jugador */
+const far=(x,z,d)=>{ for(const q of V.getPl())if(Math.hypot(x-q.x,z-q.z)<=d)return false; return true; };
+V.rndSpot=function(minD){   /* hueco al azar (sala o alas abiertas) lejos del jugador (v32: de todos los jugadores) */
   if(coreDirty)rebuildCore(); const n0=core.length/2; if(!n0)return null;
-  for(let i=0;i<16;i++){const ar=(rcore.length&&Math.random()<.5)?rcore:core,n=ar.length/2,k=((Math.random()*n)|0)*2,x=ar[k]+.5,z=ar[k+1]+.5; if(Math.hypot(x-P.x,z-P.z)>minD&&!inPillar(x,z,1.5))return {x,z};}
+  for(let i=0;i<16;i++){const ar=(rcore.length&&Math.random()<.5)?rcore:core,n=ar.length/2,k=((Math.random()*n)|0)*2,x=ar[k]+.5,z=ar[k+1]+.5; if(far(x,z,minD)&&!inPillar(x,z,1.5))return {x,z};}
   return null;
+};
+V.rndSpots=function(n){   /* v32: n huecos libres al azar por todo el laberinto abierto (reaparecer en todos contra todos) */
+  if(coreDirty)rebuildCore(); const out=[],m=core.length/2; if(!m)return out;
+  for(let i=0;i<n;i++){ const k=((Math.random()*m)|0)*2,x=core[k]+.5,z=core[k+1]+.5; if(!inPillar(x,z,1.5))out.push({x,z}); }
+  return out;
 };
 
 /* ---------- camino hacia el jugador: campo de distancias (BFS) ---------- */
-let fx=-9999,fz=-9999;
-V.flow=function(px,pz){
-  const tx=Math.floor(px),tz=Math.floor(pz); if(!V.dirty&&tx===fx&&tz===fz)return; V.dirty=false;fx=tx;fz=tz;
-  fd.fill(-1); if(sol(tx,tz))return;
-  let h=0,t=0; const s=ti(tx,tz); fd[s]=0;qu[t++]=s;
-  while(h<t){const i=qu[h++],d=fd[i]+1,x=(i%N)-OFF,z=((i/N)|0)-OFF;
-    if(x+1<OFF&&fd[i+1]<0&&!solid[i+1]){fd[i+1]=d;qu[t++]=i+1;}
-    if(x-1>=-OFF&&fd[i-1]<0&&!solid[i-1]){fd[i-1]=d;qu[t++]=i-1;}
-    if(z+1<OFF&&fd[i+N]<0&&!solid[i+N]){fd[i+N]=d;qu[t++]=i+N;}
-    if(z-1>=-OFF&&fd[i-N]<0&&!solid[i-N]){fd[i-N]=d;qu[t++]=i-N;}}
+V.getPl=()=>[P];   /* v32: jugadores a tener en cuenta (en multijugador el anfitrión pone aquí a todos) */
+V.flow=function(px,pz,sl){   /* sl: 0 = jugador local, 1..3 = compañeros (solo los calcula el anfitrión) */
+  sl=sl|0; const tx=Math.floor(px),tz=Math.floor(pz); if(V.dirty){fR.fill(-1);V.dirty=false;}
+  const kk=inb(tx,tz)?ti(tx,tz):-5; if(fR[sl]===V.rev&&fT[sl]===kk)return; fR[sl]=V.rev;fT[sl]=kk;
+  const F=FD[sl]; F.fill(-1); if(sol(tx,tz))return;
+  let h=0,t=0; const s=ti(tx,tz); F[s]=0;qu[t++]=s;
+  while(h<t){const i=qu[h++],d=F[i]+1,x=(i%N)-OFF,z=((i/N)|0)-OFF;
+    if(x+1<OFF&&F[i+1]<0&&!solid[i+1]){F[i+1]=d;qu[t++]=i+1;}
+    if(x-1>=-OFF&&F[i-1]<0&&!solid[i-1]){F[i-1]=d;qu[t++]=i-1;}
+    if(z+1<OFF&&F[i+N]<0&&!solid[i+N]){F[i+N]=d;qu[t++]=i+N;}
+    if(z-1>=-OFF&&F[i-N]<0&&!solid[i-N]){F[i-N]=d;qu[t++]=i-N;}}
 };
+V.slot=q=>q===P?0:(q&&q.fs!==undefined?q.fs:-1);
+V.pd=function(q,x,z){ const sl=V.slot(q); if(sl<0||sl>3)return -1; const tx=Math.floor(x),tz=Math.floor(z); return inb(tx,tz)?FD[sl][ti(tx,tz)]:-1; };   /* distancia de camino (baldosas) hasta ese jugador; -1 = sin camino */
 const AIM={x:0,z:0,d:0}, DIRS=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
 V.aim=function(p,T,r){   /* null = vía libre (ir recto). Si no, punto al que dirigirse y la distancia real de camino */
-  if(!V.act||T!==P)return null;
+  if(!V.act||!T)return null; const sl=V.slot(T); if(sl<0||sl>3)return null; const F=FD[sl];
   if(V.los(p.x,p.z,T.x,T.z,Math.min(.55,r)))return null;
-  let cx=Math.floor(p.x),cz=Math.floor(p.z); if(!inb(cx,cz))return null; let cd=fd[ti(cx,cz)]; if(cd<0)return null; const d0=cd; let bx=null,bz=null,fx0=null,fz0=null;
+  let cx=Math.floor(p.x),cz=Math.floor(p.z); if(!inb(cx,cz))return null; let cd=F[ti(cx,cz)]; if(cd<0)return null; const d0=cd; let bx=null,bz=null,fx0=null,fz0=null;
   for(let k=0;k<7;k++){
     let nb=null,nd=cd;
-    for(const q of DIRS){const x=cx+q[0],z=cz+q[1]; if(!inb(x,z))continue; const dd=fd[ti(x,z)]; if(dd<0||dd>=nd)continue; if(q[0]&&q[1]&&(sol(cx+q[0],cz)||sol(cx,cz+q[1])))continue; nd=dd;nb=[x,z];}
+    for(const q of DIRS){const x=cx+q[0],z=cz+q[1]; if(!inb(x,z))continue; const dd=F[ti(x,z)]; if(dd<0||dd>=nd)continue; if(q[0]&&q[1]&&(sol(cx+q[0],cz)||sol(cx,cz+q[1])))continue; nd=dd;nb=[x,z];}
     if(!nb)break; cx=nb[0];cz=nb[1];cd=nd; const tx=cx+.5,tz=cz+.5; if(fx0===null){fx0=tx;fz0=tz;}
     if(V.los(p.x,p.z,tx,tz,Math.min(.55,r))){bx=tx;bz=tz;} else break;
   }
@@ -805,6 +817,7 @@ const markGeo=(()=>{ const a=new THREE.RingGeometry(1.55,2.0,40),b=new THREE.Cir
 const markM=new THREE.MeshBasicMaterial({color:0x19f0ff,transparent:true,opacity:.8,depthWrite:false,side:THREE.DoubleSide,fog:false});
 function addMarks(w){ for(const r of w.rooms){ const c=w.wp(PIT*r.a+2+ROOM/2,PIT*r.b+2+ROOM/2); {const m=new THREE.Mesh(markGeo,markM);m.rotation.x=-Math.PI/2;m.position.set(c[0],.05,c[1]);m.renderOrder=2;grp.add(m);w.marks.push(m);} } }
 function clearMarks(w){ for(const m of w.marks)grp.remove(m); w.marks=[]; }
+const em=o=>{ if(V.net==='host'&&V.emit)V.emit(o); };
 const COL=['#19f0ff','#ff2fd0','#ffe14d','#7dff5a'];
 function drawSign(w,idx){
   const c=w.sign.cv,x=c.getContext('2d'),price=PRICES[Math.min(V.nOpen,3)],aff=V.cr>=price,col=aff?'#7dff5a':COL[idx];
@@ -825,19 +838,21 @@ function buildDoors(){
 }
 buildDoors(); grp.visible=false;
 V.price=()=>PRICES[Math.min(V.nOpen,3)];
-V.fdAt=(x,z)=>{const tx=Math.floor(x),tz=Math.floor(z);return inb(tx,tz)?fd[ti(tx,tz)]:-2;};   /* (pruebas) distancia de camino hasta el jugador */
+V.fdAt=(x,z,sl)=>{const tx=Math.floor(x),tz=Math.floor(z);return inb(tx,tz)?FD[sl|0][ti(tx,tz)]:-2;};   /* (pruebas) distancia de camino hasta el jugador */
 V.meshes=[wallM,floorM,ceilM]; V.edgeBox=eBox; V.cellsOf=eCells; V.connected=connected;
 
 /* ---------- ciclo de partida ---------- */
-V.reset=function(on){
-  V.on=!!on; V.tip=0; V.act=false; V.x0=-HX;V.x1=HX;V.z0=-HZ;V.z1=HZ; V.cr=0; V.nOpen=0; V.rt=0; V.phase=0; V.plan=null; V.near=-1; V.reshapes=0;
+V.reset=function(on,seed,net,free){
+  V.on=!!on; V.net=on?(net||null):null; V.free=!!(on&&free); V.rsT=V.free?50:RESHAPE; rnd=(seed===undefined||seed===null)?Math.random:mkRng(seed);
+  V.tip=V.free?1:0; V.act=false; V.x0=-HX;V.x1=HX;V.z0=-HZ;V.z1=HZ; V.cr=0; V.nOpen=0; V.rt=0; V.phase=0; V.plan=null; V.near=-1; V.reshapes=0;
   for(const g of V.ghosts)grp.remove(g); V.ghosts=[]; for(const s of V.slabs)grp.remove(s.m); V.slabs=[];
   solid.fill(1);trans.fill(0);dtile.fill(0);ht.fill(0);
   for(let tz=-22;tz<22;tz++)for(let tx=-22;tx<22;tx++){const i=ti(tx,tz);solid[i]=0;ht[i]=RH;}
   for(const w of WING){ clearMarks(w); w.open=false; genMaze(w.E); pickRooms(w); for(let e=0;e<NE;e++)if(w.lock[e])w.E[e]=1; for(let u=0;u<2;u++)for(let v=18;v<24;v++){const [tx,tz]=w.tl(u,v);dtile[ti(tx,tz)]=1;} }
-  V.pairs=Math.random()<.5?['NE','SO']:['NO','SE']; V.links=makeLinks().filter(l=>V.pairs.includes(l.k)); V.partner=[-1,-1,-1,-1]; V.joined=-1;
+  V.pairs=rnd()<.5?['NE','SO']:['NO','SE']; V.links=makeLinks().filter(l=>V.pairs.includes(l.k)); V.partner=[-1,-1,-1,-1]; V.joined=-1;
   for(const l of V.links){V.partner[l.w[0]]=l.w[1];V.partner[l.w[1]]=l.w[0];}
   V.rebuild(); grp.visible=V.on; for(const m of HALLW)m.visible=!V.on; V._a=-1; WING.forEach((w,j)=>{w.slab.visible=V.on;w.slab.position.y=0;w.dy=0;drawSign(w,j);});
+  rnd=Math.random; if(V.free&&V.on)for(let i=0;i<4;i++)V.openWing(i,true);   /* todos contra todos: las 4 alas abiertas desde el principio */
 };
 V.openWing=function(i,free){
   const w=WING[i]; if(!w||w.open||!V.on)return false;
@@ -845,17 +860,17 @@ V.openWing=function(i,free){
   w.open=true; V.nOpen++; carve(w); addMarks(w); V.act=true; V.joined=-1;
   for(const l of V.links)if(!l.done&&l.w.includes(i)&&WING[l.w[0]].open&&WING[l.w[1]].open){carveLink(l);V.joined=l.w[0]===i?l.w[1]:l.w[0];}   /* la pareja ya estaba abierta: aparece el pasillo de unión */
   if(w.k==='E')V.x1=64; else if(w.k==='O')V.x0=-64; else if(w.k==='S')V.z1=64; else V.z0=-64;
-  w.dy=0.0001; V.rebuild(); if(!V.rt)V.rt=RESHAPE; for(let j=0;j<4;j++)if(!WING[j].open)drawSign(WING[j],j);
+  w.dy=0.0001; V.rebuild(); if(!V.rt)V.rt=V.rsT; for(let j=0;j<4;j++)if(!WING[j].open)drawSign(WING[j],j);
   return true;
 };
 V.guards=function(i){   /* unos cuantos enemigos aparecen en el ala recién abierta */
   const w=WING[i], n=Math.max(0,Math.min(3+V.nOpen,maxEnemies()-enemies.length)); let k=0;
   for(let t=0;t<40&&k<n;t++){ const r=w.rooms[(Math.random()*w.rooms.length)|0], u=PIT*r.a+2+rand(1.5,ROOM-1.5), v=PIT*r.b+2+rand(1.5,ROOM-1.5), q=w.wp(u,v); if(V.sp(q[0],q[1]))continue; spawnEnemy(pickType(domBand()),q[0],q[1]); k++; }
 };
-V.earn=function(n){ if(!V.on)return; const b=V.cr; V.cr+=n; const pr=V.price(); if(V.nOpen<4&&b<pr&&V.cr>=pr){ banner('¡PUEDES ABRIR UNA PUERTA!','#7dff5a','acércate a una puerta de la sala · '+pr+' CR'); A.chime([523,784,1047]); } };
+V.earn=function(n){ if(!V.on||V.free)return; const b=V.cr; V.cr+=n; const pr=V.price(); if(V.nOpen<4&&b<pr&&V.cr>=pr){ banner('¡PUEDES ABRIR UNA PUERTA!','#7dff5a','acércate a una puerta de la sala · '+pr+' CR'); A.chime([523,784,1047]); } };
 
 /* ---------- reordenar el laberinto ---------- */
-function entsIn(box,m){ if(P.x>box.x0-m&&P.x<box.x1+m&&P.z>box.z0-m&&P.z<box.z1+m)return true; for(const e of enemies)if(!e.dead&&e.T.kind!=='dragon'){const p=e.g.position;if(p.x>box.x0-m-e.r&&p.x<box.x1+m+e.r&&p.z>box.z0-m-e.r&&p.z<box.z1+m+e.r)return true;} return false; }
+function entsIn(box,m){ for(const q of V.getPl()){ if(q.x>box.x0-m&&q.x<box.x1+m&&q.z>box.z0-m&&q.z<box.z1+m)return true; } for(const e of enemies)if(!e.dead&&e.T.kind!=='dragon'){const p=e.g.position;if(p.x>box.x0-m-e.r&&p.x<box.x1+m+e.r&&p.z>box.z0-m-e.r&&p.z<box.z1+m+e.r)return true;} return false; }
 function makePlan(){
   const plan=[]; for(let i=0;i<4;i++){const w=WING[i]; if(!w.open)continue;
     const E=Uint8Array.from(w.E), opened=[],closed=[], k=3+((Math.random()*3)|0);
@@ -878,24 +893,47 @@ function slabMesh(w,e){   /* muro que sube o baja (con la misma rejilla de las p
   const m=new THREE.Mesh(g2,matWall); m.frustumCulled=false; grp.add(m); return m;
 }
 function clearGhosts(){ for(const g of V.ghosts)grp.remove(g); V.ghosts=[]; }
-function warn(){
-  V.plan=makePlan(); if(!V.plan.length){V.rt=RESHAPE;return;}
-  V.phase=1; V.at=WARN; for(const p of V.plan){const w=WING[p.i]; for(const e of p.closed)ghost(w,e,0); for(const e of p.opened)ghost(w,e,1);}
+function beginWarn(plan){
+  V.plan=plan; V.phase=1; V.at=WARN; for(const p of V.plan){const w=WING[p.i]; for(const e of p.closed)ghost(w,e,0); for(const e of p.opened)ghost(w,e,1);}
   banner('¡EL LABERINTO CAMBIA!','#ff2255','pasillos rojos se cierran · verdes se abren'); A.boom(false); S.shake=Math.max(S.shake,.5);
 }
+function warn(){
+  const plan=makePlan(); if(!plan.length){V.rt=V.rsT;return;}
+  beginWarn(plan); em({k:'wr',p:plan.map(q=>[q.i,q.opened,q.closed])});
+}
 function startMove(){
-  clearGhosts(); V.phase=2; V.at=ANIM;
+  em({k:'wm'}); clearGhosts(); V.phase=2; V.at=ANIM;
   for(const p of V.plan){const w=WING[p.i]; for(const e of p.closed){setTrans(w,e,1);V.slabs.push({w,e,m:slabMesh(w,e),k:1});} for(const e of p.opened){setTrans(w,e,1);V.slabs.push({w,e,m:slabMesh(w,e),k:0});}}
   V.rebuild(); A.boom(true); S.shake=Math.max(S.shake,.8);
 }
-function endMove(){
+function endMove(skip){   /* skip (invitado): los muros que el anfitrión decidió no cerrar; devuelve esa lista */
   for(const s of V.slabs){ const w=s.w; setTrans(w,s.e,0); grp.remove(s.m); s.m.geometry.dispose(); }
-  for(const p of V.plan){const w=WING[p.i];
+  const sk=[];
+  for(const p of V.plan||[]){const w=WING[p.i];
     for(const e of p.opened){w.E[e]=1;setEdge(w,e,true);}
-    for(const e of p.closed){ if(entsIn(eBox(w,e),.5)){continue;} w.E[e]=0;setEdge(w,e,false); }   /* si alguien está justo ahí, ese muro no se cierra */
+    for(const e of p.closed){ const hold=skip?skip.some(a=>a[0]===p.i&&a[1]===e):entsIn(eBox(w,e),.5); if(hold){sk.push([p.i,e]);continue;} w.E[e]=0;setEdge(w,e,false); }   /* si alguien está justo ahí, ese muro no se cierra */
   }
-  V.slabs=[]; V.plan=null; V.phase=0; V.rt=RESHAPE; V.reshapes++; V.rebuild();
+  V.slabs=[]; V.plan=null; V.phase=0; V.rt=V.rsT; V.reshapes++; V.rebuild(); return sk;
 }
+/* v32 · invitado: copia lo que decide el anfitrión */
+V.netOpen=function(i){ if(!V.on||V.net!=='guest')return; const w=WING[i]; if(!w||w.open)return; if(V.openWing(i,true))V.openFx(i); };
+V.netWarn=function(arr){ if(!V.on||V.net!=='guest')return; if(V.phase===2&&V.plan)endMove([]); else if(V.phase===1)clearGhosts(); V.phase=0; V.plan=null; V.slabs=V.slabs||[];
+  const plan=(arr||[]).map(a=>({i:a[0],opened:a[1]||[],closed:a[2]||[]})); if(plan.length)beginWarn(plan); };
+V.netMove=function(){ if(V.net==='guest'&&V.phase===1&&V.plan)startMove(); };
+V.netEnd=function(skip){ if(V.net!=='guest')return; if(V.phase===1&&V.plan)startMove(); if(V.phase===2&&V.plan)endMove(skip||[]); };
+const bits=a=>{let t='';for(let i=0;i<a.length;i++)t+=a[i]?'1':'0';return t;};
+V.sig=()=>WING.map(w=>(w.open?'1':'0')+bits(w.E)).join('|');
+V.getState=()=>({h:V.sig(),o:WING.map(w=>w.open?1:0),e:WING.map(w=>bits(w.E)),rt:Math.round(V.rt*10)/10,ph:V.phase});
+V.setState=function(st){   /* copia el estado del anfitrión si algo se perdió por el camino (solo entre reordenados) */
+  if(!V.on||V.net!=='guest'||!st||!Array.isArray(st.o)||!Array.isArray(st.e))return;
+  if(V.phase!==0||st.ph!==0)return;
+  if(V.sig()!==st.h){ let ch=false;
+    for(let i=0;i<4;i++){ if(st.o[i]&&!WING[i].open)V.openWing(i,true); }
+    for(let i=0;i<4;i++){ const w=WING[i],t=String(st.e[i]||''); if(!w.open||t.length<NE)continue; let c=false; for(let e=0;e<NE;e++){ const v=t.charCodeAt(e)===49?1:0; if(w.E[e]!==v){w.E[e]=v;setEdge(w,e,!!v);c=true;} } if(c)ch=true; }
+    if(ch)V.rebuild(); }
+  V.rt=+st.rt||0;
+};
+V.setCr=function(n){ n=n|0; if(!V.on||n===V.cr)return; const b=V.cr,pr=V.price(); V.cr=n; if(V.nOpen<4&&!V.free&&b<pr&&n>=pr){ banner('¡PUEDES ABRIR UNA PUERTA!','#7dff5a','acércate a una puerta de la sala · '+pr+' CR'); A.chime([523,784,1047]); } };
 const FARD=46;
 function cullFar(){ const px=P.x,pz=P.z,R=FARD*FARD; let n=0;
   for(const w of WING)for(const m of w.marks){ const dx=m.position.x-px,dz=m.position.z-pz,v=dx*dx+dz*dz<R; m.visible=v; if(v)n++; }
@@ -906,10 +944,11 @@ V.tick=function(dt){
   V._cl=(V._cl||0)-dt; if(V._cl<=0){V._cl=.25;cullFar();}
   if(!V.tip&&V.nOpen===0&&S.running&&S.t>7){V.tip=1;banner('CRÉDITOS (CR)','#ffe14d','mata enemigos, junta '+V.price()+' CR y abre una puerta de la sala');}
   if(V.act){
-    V.flow(P.x,P.z);
-    if(V.phase===0){ V.rt-=dt; if(V.rt<=0)warn(); }
-    else if(V.phase===1){ const o=V.at; V.at-=dt; for(const g of V.ghosts)g.material.opacity=(g.material===ghM[0]?.25:.2)+.1*Math.sin(S.t*14); if(Math.ceil(o)!==Math.ceil(V.at)&&V.at>0)A.blip(900,900,.08,.2,'square'); if(V.at<=0)startMove(); }
-    else { V.at-=dt; const k=clamp(1-V.at/ANIM,0,1), ek=k*k*(3-2*k); for(const s of V.slabs){ s.m.position.y=-WH*(s.k?1-ek:ek)-(s.k?0:.02); } if(V.at<=0)endMove(); }
+    const gu=V.net==='guest';
+    if(!gu){ for(const q of V.getPl()){ const sl=V.slot(q); if(sl>=0&&sl<4)V.flow(q.x,q.z,sl); } }
+    if(V.phase===0){ if(gu)V.rt=Math.max(0,V.rt-dt); else{ V.rt-=dt; if(V.rt<=0)warn(); } }
+    else if(V.phase===1){ const o=V.at; V.at-=dt; for(const g of V.ghosts)g.material.opacity=(g.material===ghM[0]?.25:.2)+.1*Math.sin(S.t*14); if(Math.ceil(o)!==Math.ceil(V.at)&&V.at>0)A.blip(900,900,.08,.2,'square'); if(V.at<=0&&!gu)startMove(); }
+    else { V.at-=dt; const k=clamp(1-V.at/ANIM,0,1), ek=k*k*(3-2*k); for(const s of V.slabs){ s.m.position.y=-WH*(s.k?1-ek:ek)-(s.k?0:.02); } if(V.at<=0&&!gu){ const sk=endMove(); em({k:'we',s:sk}); } }
   }
   /* puertas: cercanía, avisos y animación de apertura */
   let near=-1,bd=7.5; for(let i=0;i<4;i++){const w=WING[i]; if(w.open){ if(w.dy>0&&w.dy<1){w.dy=Math.min(1,w.dy+dt/.9);w.slab.position.y=(DH+.2)*(w.dy*w.dy*(3-2*w.dy)); if(w.dy>=1)w.slab.visible=false;} continue; } const c=w.wp(.3,21),d=Math.hypot(c[0]-P.x,c[1]-P.z); if(d<bd&&S.running){bd=d;near=i;}}
@@ -918,7 +957,7 @@ V.tick=function(dt){
 };
 /* ---------- mapa: plano del laberinto abierto, en vivo ---------- */
 const mapC=document.createElement('canvas'); let mapI=null,mapW=0,mapH=0,mapKey='';
-V.drawMap=function(cv,px,pz,yaw,ens){
+V.drawMap=function(cv,px,pz,yaw,ens,mates){
   const g=cv.getContext('2d'),CW=cv.width,CH=cv.height;
   const tx0=Math.floor(V.x0)-1,tx1=Math.ceil(V.x1)+1,tz0=Math.floor(V.z0)-1,tz1=Math.ceil(V.z1)+1,nw=tx1-tx0,nh=tz1-tz0;
   if(mapW!==nw||mapH!==nh){mapC.width=mapW=nw;mapC.height=mapH=nh;mapI=mapC.getContext('2d').createImageData(nw,nh);}
@@ -943,14 +982,18 @@ V.drawMap=function(cv,px,pz,yaw,ens){
   const fs=Math.max(10,Math.min(16,sc*3.2)); g.font='bold '+fs+'px Arial,sans-serif'; g.textAlign='center'; g.textBaseline='middle';
   const pr=V.price(); WING.forEach((w,j)=>{ if(w.open)return; const c=w.wp(-3.4,21),t=w.k+' '+pr; const wd=g.measureText(t).width+8, lx=Math.max(wd/2+2,Math.min(CW-wd/2-2,X(c[0]))), ly=Math.max(fs,Math.min(CH-fs-26,Y(c[1]))); g.fillStyle='rgba(8,4,20,.82)'; g.fillRect(lx-wd/2,ly-fs*.7,wd,fs*1.4); g.fillStyle=V.cr>=pr?'#7dff5a':'#ffd84a'; g.fillText(t,lx,ly); });
   g.fillStyle='#ff3b5c'; for(const e of ens){ if(e.dead)continue; const p=e.g.position,r=Math.max(1.8,Math.min(5,(e.r||.5)*sc*.9)); g.beginPath(); g.arc(X(p.x),Y(p.z),r,0,7); g.fill(); }
+  if(mates)for(const m of mates){ g.beginPath(); g.arc(X(m.x),Y(m.z),5,0,7); g.fillStyle=m.d?'#777':m.c; g.fill(); g.lineWidth=1.5; g.strokeStyle='#fff'; g.stroke(); }
   const ac=Math.max(6,Math.min(11,sc*2.6)),fx=-Math.sin(yaw),fz=-Math.cos(yaw),qx=X(px),qy=Y(pz);
   g.beginPath(); g.moveTo(qx+fx*ac,qy+fz*ac); g.lineTo(qx-fx*ac*.6-fz*ac*.7,qy-fz*ac*.6+fx*ac*.7); g.lineTo(qx-fx*ac*.6+fz*ac*.7,qy-fz*ac*.6-fx*ac*.7); g.closePath(); g.fillStyle='#ffe14d'; g.fill(); g.lineWidth=1.5; g.strokeStyle='#201000'; g.stroke();
   if(V.act){ const t=V.phase===0?'CAMBIA EN '+Math.max(0,Math.ceil(V.rt))+' s':'¡EL LABERINTO CAMBIA!'; g.font='bold 13px Arial,sans-serif'; g.textAlign='center'; const wd=g.measureText(t).width+14; g.fillStyle='rgba(8,4,20,.85)'; g.fillRect(CW/2-wd/2,CH-24,wd,19); g.fillStyle=V.phase===0?(V.rt<10?'#ffb347':'#d9d2ff'):'#ff6b8a'; g.fillText(t,CW/2,CH-14); }
 };
+V.openFx=function(i){ const w=WING[i],pj=V.partner[i]; banner('PUERTA '+w.n+' ABIERTA','#7dff5a',V.joined>=0?'pasillo de unión abierto con '+WING[V.joined].n+' · ¡cuidado!':(pj>=0?'se unirá con '+WING[pj].n+' cuando abras su puerta':'el laberinto se extiende · ¡cuidado!')); A.chime([392,523,659,784]); A.boom(true); S.shake=Math.max(S.shake,.6); };
+V.doOpen=function(i){ if(V.net==='guest')return false; if(V.openWing(i)){ V.openFx(i); V.guards(i); em({k:'wo',i}); return true; } return false; };
 V.try=function(){
-  if(!V.on||V.near<0||!S.running||S.over)return false; const w=WING[V.near],price=V.price();
+  if(!V.on||V.near<0||!S.running||S.over)return false; const price=V.price();
   if(V.cr<price){ banner('FALTAN '+(price-V.cr)+' CRÉDITOS','#ff6b8a','mata enemigos para ganar más'); A.blip(200,120,.2,.3,'sawtooth','no'); return false; }
-  const i=V.near; if(V.openWing(i)){ const pj=V.partner[i]; banner('PUERTA '+w.n+' ABIERTA','#7dff5a',V.joined>=0?'pasillo de unión abierto con '+WING[V.joined].n+' · ¡cuidado!':(pj>=0?'se unirá con '+WING[pj].n+' cuando abras su puerta':'el laberinto se extiende · ¡cuidado!')); A.chime([392,523,659,784]); A.boom(true); S.shake=Math.max(S.shake,.6); V.guards(i); return true; } return false;
+  if(V.net==='guest'){ if(V.onReq)V.onReq(V.near); return true; }   /* el invitado solo pide; el anfitrión comprueba y abre para todos */
+  return V.doOpen(V.near);
 };
 return V;
 })();
@@ -1197,7 +1240,9 @@ for(const k in TYPES)TYPES[k].key=k;   /* v20: clave del tipo de enemigo para la
 const isDownQ=q=>q.loc?S.down:q.down;
 function pickT(pos){
   if(!MP.host)return P;
-  let b=null,bd=1e9; for(const q of MP.roster){ if(isDownQ(q))continue; const d=(q.x-pos.x)*(q.x-pos.x)+(q.z-pos.z)*(q.z-pos.z); if(d<bd){bd=d;b=q;} }
+  let b=null,bd=1e9; const wa=W.act; for(const q of MP.roster){ if(isDownQ(q))continue; let d=(q.x-pos.x)*(q.x-pos.x)+(q.z-pos.z)*(q.z-pos.z);
+    if(wa){ const pd=W.pd(q,pos.x,pos.z); d=pd>=0?pd*pd:1e6+d; }   /* v32: con laberinto manda la distancia de camino, no la de línea recta */
+    if(d<bd){bd=d;b=q;} }
   return b||P;
 }
 function randT(){ if(!MP.host)return P; const l=MP.roster.filter(q=>!isDownQ(q)); return l.length?l[(Math.random()*l.length)|0]:P; }
@@ -1732,7 +1777,7 @@ function damageEnemy(e,dmg,crit,pos,quiet,beat){
 function killEnemy(e){
   if(e.dead)return; e.dead=true; e.dieT=.35; dying.push(e); const p=e.g.position, T=e.T; if(MP.host)MP.die(e);
   if(!e.self){
-    S.tk++; if(KILLER)MP.rewardKill(KILLER,e); else{ S.kills++; W.earn(Math.round(T.score/4)+1); {const q=Tel.r;q.kt[T.key]=(q.kt[T.key]||0)+1;if(Tel.src>=0)q.w[Tel.src][6]++;} S.combo++; S.comboT=3.2; S.maxCombo=Math.max(S.maxCombo,S.combo); addScore(T.score); S.ult=Math.min(100,S.ult+T.score/3);
+    S.tk++; if(KILLER){ MP.rewardKill(KILLER,e); W.earn(Math.round(T.score/4)+1); } else{ S.kills++; W.earn(Math.round(T.score/4)+1); {const q=Tel.r;q.kt[T.key]=(q.kt[T.key]||0)+1;if(Tel.src>=0)q.w[Tel.src][6]++;} S.combo++; S.comboT=3.2; S.maxCombo=Math.max(S.maxCombo,S.combo); addScore(T.score); S.ult=Math.min(100,S.ult+T.score/3);
     S.killTime=lerp(S.killTime,e.age,0.15); S.killRate=lerp(S.killRate,1,0.2); A.kill(); $('combo').classList.remove('pop'); void $('combo').offsetWidth; $('combo').classList.add('pop');
     if(S.kills%20===0)healPlayer(6);
     if(S.up.vamp)healPlayer(S.up.vamp,true);
@@ -1782,7 +1827,7 @@ $('doorBtn').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDef
 let mapOpen=false,mapT=0;
 function setMap(v){mapOpen=!!v;$('mapBtn').classList.toggle('on',mapOpen);$('mapBox').classList.toggle('on',mapOpen&&W.on&&S.running);mapT=0;}
 function toggleMap(){if(W.on&&S.running)setMap(!mapOpen);}
-function updMap(){const show=W.on&&S.running;$('mapBtn').classList.toggle('show',show);if(!show){if(mapOpen)setMap(false);return;}if(!mapOpen)return;const t=performance.now();if(t-mapT<200)return;mapT=t;$('mapBox').classList.add('on');W.drawMap($('mapCv'),P.x,P.z,S.yaw,enemies);}
+function updMap(){const show=W.on&&S.running;$('mapBtn').classList.toggle('show',show);if(!show){if(mapOpen)setMap(false);return;}if(!mapOpen)return;const t=performance.now();if(t-mapT<200)return;mapT=t;$('mapBox').classList.add('on');W.drawMap($('mapCv'),P.x,P.z,S.yaw,enemies,(MP.on&&!MP.pvp)?[...MP.oth.values()].map(q=>({x:q.x,z:q.z,c:['#19f0ff','#ff2fd0','#ffe14d','#7dff5a'][Math.max(0,MP.ids.indexOf(q.id))%4],d:q.down})):null);}
 $('mapBtn').addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();toggleMap();});
 function setupChar(){
   const c=CHARS[S.char]; ab1.style.setProperty('--ac',c.col); ab2.style.setProperty('--ac',c.col); ab1.firstChild.textContent=c.a.name; ab2.firstChild.textContent=c.u.name;
@@ -2024,7 +2069,7 @@ function fireBeat(tEx){
     if(frz)continue;
     if(T.ai==='dragon'){ if(T.alt){ if(e.bc%3===2)e.wind=1; if(e.bc%3===0)volley(e,5,.3,'acid'); } else { if(e.bc%4===3)e.wind=1; if(e.bc%4===0)volley(e,3,.24); } }
     else if(T.ai==='blink'){ if(e.bc%4===0)blinkEnemy(e); }
-    else if(T.ai==='spit'){ if(e.bc%3===0&&minDP(e.g.position.x,e.g.position.z)<26&&(!W.act||W.los(e.g.position.x,e.g.position.z,P.x,P.z,0)))spit(e); }
+    else if(T.ai==='spit'){ if(e.bc%3===0&&minDP(e.g.position.x,e.g.position.z)<26&&(!W.act||(q=>W.los(e.g.position.x,e.g.position.z,q.x,q.z,0))(pickT(e.g.position))))spit(e); }
     else if(T.boss){ bossBeat(e); }
     else if(T.ai==='heal'){ healWave(e); }
   }
@@ -2281,7 +2326,7 @@ function upd(k,v,fn){if(lastHud[k]!==v){lastHud[k]=v;fn(v);}}
 function updHud(){ if(fansDirty){fansDirty=false;renderFans();}
   upd('hp',Math.ceil(S.hp)+'/'+S.maxHp,()=>{$('hpFill').style.transform='scaleX('+clamp(S.hp/S.maxHp,0,1)+')';$('hpTxt').textContent=Math.ceil(S.hp);});
   upd('sc',S.score,v=>$('score').textContent=v.toLocaleString('es'));
-  upd('di',S.level+'|'+S.kills+'|'+(W.on?W.cr+'|'+(W.nOpen<W.nMax&&W.cr>=W.price()?1:0):-1),()=>{const d=$('dist');d.textContent='NIVEL '+S.level+' · '+S.kills+' BAJAS';if(W.on){const c=document.createElement('span');c.className='cr'+(W.nOpen<W.nMax&&W.cr>=W.price()?' ok':'');c.textContent=W.cr+' CR';d.appendChild(c);}});
+  upd('di',S.level+'|'+S.kills+'|'+(W.on?W.cr+'|'+(W.nOpen<W.nMax&&W.cr>=W.price()?1:0):-1),()=>{const d=$('dist');d.textContent='NIVEL '+S.level+' · '+S.kills+' BAJAS';if(W.on&&!W.free){const c=document.createElement('span');c.className='cr'+(W.nOpen<W.nMax&&W.cr>=W.price()?' ok':'');c.textContent=W.cr+' CR';d.appendChild(c);}});
   upd('cb',S.combo,v=>$('combo').textContent=v>1?'x'+v:'');
   updMap();
   { const k=W.on?W.nOpen+'|'+W.near+'|'+(W.cr>=W.price()?1:0)+'|'+(W.price()-W.cr)+'|'+S.running:'off'; upd('wk',k,()=>{ const db=$('doorBtn');
@@ -2658,7 +2703,7 @@ const PVP_MUL=.3, PVP_FRAG=300, PVP_TIME=300, PVP_RESP=3.5;   /* daño entre jug
 
 Object.assign(MP,{
   ws:null,code:'',myId:0,hostId:1,plist:[],ids:[],names:{},oth:new Map(),gh:new Map(),gp:new Map(),gz:new Map(),evq:[],trq:[],seq:0,snapAcc:0,stAcc:0,
-  claims:new Map(),phq:new Map(),rtt:0,pingT:0,pq:{},smp:[],off:0,binfo:null,modo:'coop',pvp:false,tl:300,lastSnap:0,board:null,rv:0,inRoom:false,mkey:'',lostMsg:'',revNote:0,
+  seed:0,lab:false,labPref:store.get('nbr.mplab',true)!==false,labG:true,claims:new Map(),phq:new Map(),rtt:0,pingT:0,pq:{},smp:[],off:0,binfo:null,modo:'coop',pvp:false,tl:300,lastSnap:0,board:null,rv:0,inRoom:false,mkey:'',lostMsg:'',revNote:0,
   spawnX(){ if(!MP.on)return 0; const i=Math.max(0,MP.ids.indexOf(MP.myId)); return (i-(MP.ids.length-1)/2)*3; },
   nick(){ const v=($('mpNick').value||'').trim(); return v||(PF.d&&PF.d.nick)||'Jugador'; },
   setSt(t,cls){ const e=$('mpSt'); e.textContent=t||''; e.className='pst'+(cls?' '+cls:''); },
@@ -2688,7 +2733,7 @@ Object.assign(MP,{
   },
   onMsg(m){
     const t=m.t;
-    if(t==='sala'||t==='lista'){ MP.code=m.code; MP.hostId=m.host; MP.plist=m.jug||[]; MP.modo=m.modo==='pvp'?'pvp':'coop'; if(t==='sala'){MP.myId=m.yo; MP.inRoom=true; MP.setSt('');} MP.renderRoom(); }
+    if(t==='sala'||t==='lista'){ MP.code=m.code; MP.hostId=m.host; MP.plist=m.jug||[]; MP.modo=m.modo==='pvp'?'pvp':'coop'; if(t==='sala'){MP.myId=m.yo; MP.inRoom=true; MP.setSt('');} MP.renderRoom(); if(MP.inRoom&&MP.myId===MP.hostId)MP.rl({k:'lobby',lab:MP.labPref?1:0},'*'); }
     else if(t==='err'){ MP.setSt(ERR[m.e]||'No se pudo entrar a la sala.','err'); }
     else if(t==='empezar'){ MP.begin(m); }
     else if(t==='sale'){ MP.playerLeft(m.id); }
@@ -2706,6 +2751,8 @@ Object.assign(MP,{
     if(!host)h=(pv?'Modo: TODOS CONTRA TODOS. ':'Modo: EN EQUIPO. ')+'Esperando a que el anfitrión empiece la partida…';
     else if(MP.plist.length<2)h='Comparte el código o el enlace y espera a tus amigos (hasta 4 jugadores). También puedes empezar solo para probar.';
     else h=(pv?'Todos contra todos: 5 minutos, gana quien sume más puntos (monstruos y jugadores).':'Cuando estén todos, pulsa EMPEZAR.')+' Cada uno oye su propia música.';
+    { const lb=host?MP.labPref:MP.labG; $('mpLab').textContent='🧩 LABERINTO: '+(lb?'SÍ':'NO'); $('mpLab').classList.toggle('on',lb); $('mpLabBox').style.pointerEvents=host?'':'none'; $('mpLabBox').style.opacity=host?'':'.75';
+      if(lb)h+=pv?' Con laberinto: las 4 alas abiertas desde el principio y los pasillos cambian cada pocos segundos.':' Con laberinto: los créditos son de todos y cualquiera puede abrir las puertas.'; }
     $('mpHint').textContent=h;
   },
   /* ---------- reloj común con el servidor (v23) ---------- */
@@ -2729,12 +2776,19 @@ Object.assign(MP,{
   /* ---------- inicio y fin de partida ---------- */
   begin(m){
     if(MP.on)return; MP.ids=m.ids||[]; MP.names={}; MP.ids.forEach((id,i)=>MP.names[id]=m.n[i]||('Jugador '+id));
-    MP.host=MP.myId===MP.hostId; MP.guest=!MP.host; MP.on=true; MP.modo=m.modo==='pvp'?'pvp':'coop'; MP.pvp=MP.modo==='pvp'; MP.tl=PVP_TIME; MP.phq.clear(); MP.clear(); MP.lostMsg=''; MP.board=null; MP.seq=0; MP.rv=0; MP.snapAcc=0; MP.stAcc=0; MP.lastSnap=performance.now();
-    P.id=MP.myId; P.loc=true; MP.roster=[P]; P.dm=0; P.rn=0; P.hlp=null; P.fr=0; P.de=0; P.lastBy=0; P.lastByT=-9; P.wd=false; MP.binfo=null;
+    MP.host=MP.myId===MP.hostId; MP.guest=!MP.host; MP.on=true; MP.seed=(m.seed|0)||1; MP.lab=MP.host&&!!MP.labPref; MP.modo=m.modo==='pvp'?'pvp':'coop'; MP.pvp=MP.modo==='pvp'; MP.tl=PVP_TIME; MP.phq.clear(); MP.clear(); MP.lostMsg=''; MP.board=null; MP.seq=0; MP.rv=0; MP.snapAcc=0; MP.stAcc=0; MP.lastSnap=performance.now();
+    P.id=MP.myId; P.loc=true; P.fs=0; MP.roster=[P]; P.dm=0; P.rn=0; P.hlp=null; P.fr=0; P.de=0; P.lastBy=0; P.lastByT=-9; P.wd=false; MP.binfo=null;
     if(MP.host&&PERF.mode==='auto'&&ql<2){ ql=2; PERF.bad=PERF.good=0; PERF.skip=2; applyQ(); }   /* el anfitrión corre toda la partida: empieza algo más ligero y sube solo si le sobra */
-    for(const id of MP.ids){ if(id===MP.myId)continue; const q={id,nick:MP.names[id],x:0,z:8,rx:0,rz:8,yaw:0,ry:0,hp:100,mhp:100,down:false,rv:0,sc:0,kl:0,ch:0,sh:0,inv:0,loc:false,t:S.t,revT:-9,av:null,dm:0,rn:0,mc:0,hlp:null,fr:0,de:0,lastBy:0,lastByT:-9,wd:false}; MP.oth.set(id,q); if(MP.host)MP.roster.push(q); }
+    for(const id of MP.ids){ if(id===MP.myId)continue; const q={id,nick:MP.names[id],x:0,z:8,rx:0,rz:8,yaw:0,ry:0,hp:100,mhp:100,down:false,rv:0,sc:0,kl:0,ch:0,sh:0,inv:0,loc:false,t:S.t,revT:-9,av:null,dm:0,rn:0,mc:0,hlp:null,fr:0,de:0,lastBy:0,lastByT:-9,wd:false}; MP.oth.set(id,q); if(MP.host){ q.fs=MP.roster.length; MP.roster.push(q); } }
     $('mp').classList.add('hide'); startGame();
+    if(MP.host&&MP.lab){ MP.rl({k:'lab',on:1,seed:MP.seed},'*'); MP.labBanner(); }   /* los invitados crean el mismo laberinto al recibirlo */
     if(MP.pvp){ const sp=MP.startPt(); P.x=sp.x; P.z=sp.z; S.px=P.x; S.pz=P.z; }   /* en todos contra todos cada uno sale en un punto distinto del salón */
+  },
+  labBanner(){ if(MP.pvp)banner('LABERINTO ABIERTO','#19f0ff','las 4 alas abiertas · los pasillos cambian · ¡a cazar!'); else banner('LABERINTO EN EQUIPO','#19f0ff','matad, juntad créditos y abrid puertas entre todos'); },
+  guestLab(d){ MP.lab=!!d.on; if(!MP.lab)return; W.reset(true,(d.seed|0)||MP.seed,'guest',MP.pvp); MP.labBanner(); },
+  doorReq(from,i){   /* anfitrión: un compañero pide abrir una puerta; se comprueba que esté cerca y que alcancen los créditos de todos */
+    if(!W.on||MP.pvp||S.over||!(i>=0&&i<4))return; const q=MP.oth.get(from); if(!q||q.down)return; const w=W.wings[i]; if(!w||w.open||W.cr<W.price())return;
+    const c=w.wp(.3,21); if(Math.hypot(c[0]-q.x,c[1]-q.z)>10)return; W.doOpen(i);
   },
   clear(){
     for(const q of MP.oth.values())MP.avDrop(q); MP.oth.clear(); MP.roster=[P];
@@ -2764,6 +2818,7 @@ Object.assign(MP,{
 
   /* ---------- mensajes de juego ---------- */
   onRelay(from,d){
+    if(d&&d.k==='lobby'&&!MP.on&&from===MP.hostId){ MP.labG=!!d.lab; MP.renderRoom(); return; }   /* sala de espera: el anfitrión dice si habrá laberinto */
     if(!MP.on||!d)return;
     if(MP.host){
       const q=MP.oth.get(from); if(!q)return;
@@ -2774,6 +2829,7 @@ Object.assign(MP,{
       } else if(d.k==='c'&&Array.isArray(d.a)){ for(const c of d.a.slice(0,40))MP.applyClaim(from,c); }
       else if(d.k==='ph'&&Array.isArray(d.a)){ for(const c of d.a.slice(0,8)){ const tq=c[0]===MP.myId?P:MP.oth.get(c[0]); if(tq&&tq.id!==from)MP.dealPvp(from,tq,clamp(+c[1]||0,0,300)); } }
       else if(d.k==='tr'&&Array.isArray(d.a)){ const a=d.a.slice(0,4); for(const t of a)MP.drawTr(t); MP.ev({k:'tr',id:from,a}); }
+      else if(d.k==='dr'){ MP.doorReq(from,d.i|0); }
     } else {
       if(from!==MP.hostId)return;
       if(d.k==='s')MP.applySnap(d);
@@ -2795,6 +2851,11 @@ Object.assign(MP,{
     else if(k==='tr'){ if(d.id!==MP.myId&&Array.isArray(d.a))for(const t of d.a)MP.drawTr(t); }
     else if(k==='fr'){ MP.fragFeed(d.by,d.to); }
     else if(k==='die'){ const e=MP.gh.get(d.id); if(e)MP.ghostDie(e); }
+    else if(k==='lab'){ MP.guestLab(d); }
+    else if(k==='wo'){ W.netOpen(d.i|0); }
+    else if(k==='wr'){ W.netWarn(d.p); }
+    else if(k==='wm'){ W.netMove(); }
+    else if(k==='we'){ W.netEnd(d.s); }
     else if(k==='over'){ MP.board=d.st||null; MP.binfo=Array.isArray(d.i)?d.i:null; if(!S.over){ S.hp=0; gameOver(); } }
   },
   guestKill(ty){
@@ -2827,6 +2888,7 @@ Object.assign(MP,{
   },
   spawnPt(){   /* punto del salón libre de pilares y lo más lejos posible de los demás jugadores y de los monstruos */
     let best=null,bs=-1;
+    if(W.act){ for(const sp of W.rndSpots(16)){ let m=1e9; for(const o of MP.oth.values()){ if(!o.down)m=Math.min(m,Math.hypot(sp.x-o.x,sp.z-o.z)); } for(const e of enemies){ if(!e.dead)m=Math.min(m,Math.hypot(sp.x-e.g.position.x,sp.z-e.g.position.z)*1.6); } if(m>bs){bs=m;best=sp;} } if(best)return best; }
     for(let k=0;k<16;k++){
       const x=rand(-HX+4,HX-4), z=rand(-HZ+4,HZ-4); let ok=true;
       for(const q of PIL)if(Math.hypot(x-q[0],z-q[1])<PR+1.3){ok=false;break;} if(!ok)continue;
@@ -2893,7 +2955,7 @@ Object.assign(MP,{
       const dnq=isDn(q); if(dnq&&!q.wd){ q.wd=true; MP.onDown(q); } else if(!dnq)q.wd=false;
       if(!dnq){ if(q.loc)MP.rv=0; else q.rv=0; continue; }
       if(MP.pvp){ let rv=(q.loc?MP.rv:q.rv)||0; rv=Math.min(1,rv+rdt/PVP_RESP); if(q.loc)MP.rv=rv; else q.rv=rv; if(rv>=1)MP.revive(q); continue; }   /* en PvP se reaparece solo */
-      let near=null; for(const o of L){ if(o===q||isDn(o))continue; if(Math.hypot(o.x-q.x,o.z-q.z)<2.8){near=o;break;} } if(near)q.hlp=near;
+      let near=null; for(const o of L){ if(o===q||isDn(o))continue; if(Math.hypot(o.x-q.x,o.z-q.z)<2.8&&(!W.act||W.los(o.x,o.z,q.x,q.z,0))){near=o;break;} } if(near)q.hlp=near;
       let rv=(q.loc?MP.rv:q.rv)||0; rv=near?Math.min(1,rv+rdt/2.5):Math.max(0,rv-rdt*.4);
       if(q.loc)MP.rv=rv; else q.rv=rv; if(rv>=1)MP.revive(q);
     }
@@ -2917,7 +2979,7 @@ Object.assign(MP,{
     }
     if(MP.trq.length){ MP.ev({k:'tr',id:MP.myId,a:MP.trq.slice()}); MP.trq.length=0; }
     const ev=MP.evq; MP.evq=[];
-    if(MP.oth.size)MP.rl({k:'s',n:++MP.seq,tl:Math.round(MP.tl),lv:S.level,tk:S.tk|0,df:r2(S.diff),ph:PHI[A.phase]|0,e,pj,zn,kt,pl,ev},'*');
+    if(MP.oth.size)MP.rl({k:'s',n:++MP.seq,tl:Math.round(MP.tl),cr:W.on?(W.cr|0):undefined,mz:(W.on&&MP.seq%30===1)?W.getState():undefined,lv:S.level,tk:S.tk|0,df:r2(S.diff),ph:PHI[A.phase]|0,e,pj,zn,kt,pl,ev},'*');
   },
 
   /* ---------- invitado: cada fotograma ---------- */
@@ -2939,6 +3001,7 @@ Object.assign(MP,{
   },
   applySnap(s){
     if(!(s.n>MP.seq))return; MP.seq=s.n; MP.lastSnap=performance.now();
+    if(W.on&&MP.lab){ if(s.cr!==undefined)W.setCr(s.cr); if(s.mz)W.setState(s.mz); }
     if(s.tl!==undefined)MP.tl=+s.tl; S.diff=+s.df||0; S.tk=s.tk|0; A.phase=PHN[s.ph]||A.phase; let g=0; while(S.level<s.lv&&g++<20)MP.guestLevel();
     MP.ghostSync(s.e||[]); MP.projSync(s.pj||[]); MP.zoneSync(s.zn||[]); MP.kitSync(s.kt||[]); MP.plSync(s.pl||[]);
     if(s.ev)for(const ev of s.ev)MP.guestEv(ev);
@@ -3072,8 +3135,10 @@ $('mpShare').addEventListener('click',()=>MP.share());
 $('mpCopy').addEventListener('click',()=>MP.copy());
 $('mpStart').addEventListener('click',()=>{if(MP.inRoom&&MP.myId===MP.hostId)MP.send({t:'empezar'});});
 $('mpLeave').addEventListener('click',()=>MP.leaveRoom());
+$('mpLab').addEventListener('click',()=>{ if(MP.inRoom&&MP.myId===MP.hostId){ MP.labPref=!MP.labPref; store.set('nbr.mplab',MP.labPref); MP.renderRoom(); MP.rl({k:'lobby',lab:MP.labPref?1:0},'*'); } });
 for(const b of $('mpModo').children)b.addEventListener('click',()=>{ if(MP.inRoom&&MP.myId===MP.hostId)MP.send({t:'modo',m:b.dataset.v}); });
 $('mpClose').addEventListener('click',()=>MP.closeUi());
+W.getPl=()=>(MP.on&&MP.host)?MP.roster:[P]; W.emit=o=>MP.ev(o); W.onReq=i=>MP.rl({k:'dr',i});
 {const q=new URLSearchParams(location.search).get('sala'); if(q&&/^[A-Za-z]{4}$/.test(q)){MP.open(q.toUpperCase()); if(($('mpNick').value||'').trim())MP.join(); else MP.setSt('Escribe tu apodo y pulsa UNIRME.');}}
 /* ================= Flujo ================= */
 function resetGame(){
@@ -3081,7 +3146,7 @@ function resetGame(){
   const c=CHARS[S.char];
   Object.assign(S,{over:false,t:0,score:0,combo:0,comboT:0,maxCombo:0,kills:0,hp:c.hp,maxHp:c.hp,level:1,boost:0,minigunT:0,wcd:0,reload:null,shots:0,hits:0,rS:0,rH:0,killTime:4,killRate:0,diff:.3,shake:0,slowT:0,spawnT:1.5,perks:{},hurtT:0,likes:0,slowmo:1,acd:0,ult:0,inv:0,shield:0,ultFx:null,stuck:0,pitch:0,yaw:0,tension:0,peak:0,peakK:0,peakCd:5,punch:0,dutch:0,hitStop:0,dropSlow:0,bobT:0,freezeT:0,discoT:0,lookX:0,lookY:0,hole:null,kitT:0,medCd:8,healCd:14,healSaid:0,up:newUp(),pick:false,pickQ:0,pickAt:0,prof:newProf(),tankE:null,linkT:0,flow:0,flowHold:.7,flowBeat:-1,rail:0,railRoll:0,railSide:1,railFx:0,dodgeCd:0,dodgeEnd:0,pdSlow:0,pdCd:0,px:MP.spawnX(),pz:8,down:false,tk:0});
   $('up').classList.remove('on');
-  P.x=MP.spawnX();P.z=8;P.vx=P.vz=0;P.speed=0;P.dash=null; WEAPONS.forEach((w,i)=>ammo[i]=w.mag); S.cur=-1; S.prev=1; selectWeapon(1,true); cross.classList.remove('rel'); lastHud={}; $('feed').innerHTML=''; A.beatN=0; A.drop=false; A.phase='intro'; setupChar(); Tel.reset(); WHO=''; W.reset(CFG.maze&&!MP.on&&!MP.guest);
+  P.x=MP.spawnX();P.z=8;P.vx=P.vz=0;P.speed=0;P.dash=null; WEAPONS.forEach((w,i)=>ammo[i]=w.mag); S.cur=-1; S.prev=1; selectWeapon(1,true); cross.classList.remove('rel'); lastHud={}; $('feed').innerHTML=''; A.beatN=0; A.drop=false; A.phase='intro'; setupChar(); Tel.reset(); WHO=''; W.reset(MP.on?(MP.host&&MP.lab):CFG.maze,MP.on?MP.seed:undefined,MP.on?(MP.host?'host':'guest'):null,MP.on&&MP.pvp&&MP.host&&MP.lab);
 }
 function startGame(){
   $('start').classList.add('hide'); $('over').classList.add('hide'); document.body.classList.add('play'); S.char=CFG.ch; heroVM(S.char); resetGame();
