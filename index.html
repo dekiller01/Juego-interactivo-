@@ -512,6 +512,7 @@ const $ = id => document.getElementById(id);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*t, rand=(a,b)=>a+Math.random()*(b-a), DEG=Math.PI/180;
 const nowS=()=>performance.now()/1000;
 const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const NBR_VER=32.1, NBR_LABEL='v32.1';   /* v32.1: el juego dice su versión (lo ven la sala y la línea de FPS) para saber quién está desactualizado */
 const CFG={mv:store.get('nbr.mv',0.8),sv:store.get('nbr.sv',0.9),hq:store.get('nbr.hq',false),ws:store.get('nbr.ws',''),ch:store.get('nbr.ch',0),pan:store.get('nbr.pan',true)!==false,maze:store.get('nbr.maze',true)!==false,sync:+store.get('nbr.sync',0)||0};
 const Vec=THREE.Vector3;
 
@@ -2703,7 +2704,7 @@ const PVP_MUL=.3, PVP_FRAG=300, PVP_TIME=300, PVP_RESP=3.5;   /* daño entre jug
 
 Object.assign(MP,{
   ws:null,code:'',myId:0,hostId:1,plist:[],ids:[],names:{},oth:new Map(),gh:new Map(),gp:new Map(),gz:new Map(),evq:[],trq:[],seq:0,snapAcc:0,stAcc:0,
-  seed:0,lab:false,labPref:store.get('nbr.mplab',true)!==false,labG:true,claims:new Map(),phq:new Map(),rtt:0,pingT:0,pq:{},smp:[],off:0,binfo:null,modo:'coop',pvp:false,tl:300,lastSnap:0,board:null,rv:0,inRoom:false,mkey:'',lostMsg:'',revNote:0,
+  seed:0,lab:false,labPref:store.get('nbr.mplab',true)!==false,labG:null,vers:{},hostVer:0,joinT:0,claims:new Map(),phq:new Map(),rtt:0,pingT:0,pq:{},smp:[],off:0,binfo:null,modo:'coop',pvp:false,tl:300,lastSnap:0,board:null,rv:0,inRoom:false,mkey:'',lostMsg:'',revNote:0,
   spawnX(){ if(!MP.on)return 0; const i=Math.max(0,MP.ids.indexOf(MP.myId)); return (i-(MP.ids.length-1)/2)*3; },
   nick(){ const v=($('mpNick').value||'').trim(); return v||(PF.d&&PF.d.nick)||'Jugador'; },
   setSt(t,cls){ const e=$('mpSt'); e.textContent=t||''; e.className='pst'+(cls?' '+cls:''); },
@@ -2733,7 +2734,7 @@ Object.assign(MP,{
   },
   onMsg(m){
     const t=m.t;
-    if(t==='sala'||t==='lista'){ MP.code=m.code; MP.hostId=m.host; MP.plist=m.jug||[]; MP.modo=m.modo==='pvp'?'pvp':'coop'; if(t==='sala'){MP.myId=m.yo; MP.inRoom=true; MP.setSt('');} MP.renderRoom(); if(MP.inRoom&&MP.myId===MP.hostId)MP.rl({k:'lobby',lab:MP.labPref?1:0},'*'); }
+    if(t==='sala'||t==='lista'){ MP.code=m.code; MP.hostId=m.host; MP.plist=m.jug||[]; MP.modo=m.modo==='pvp'?'pvp':'coop'; if(t==='sala'){MP.myId=m.yo; MP.inRoom=true; MP.setSt(''); MP.vers={}; MP.hostVer=0; MP.labG=null; MP.joinT=performance.now(); setTimeout(()=>MP.renderRoom(),2800);} MP.renderRoom(); if(MP.inRoom){ if(MP.myId===MP.hostId)MP.rl({k:'lobby',lab:MP.labPref?1:0,v:NBR_VER},'*'); else MP.rl({k:'ver',v:NBR_VER}); } }
     else if(t==='err'){ MP.setSt(ERR[m.e]||'No se pudo entrar a la sala.','err'); }
     else if(t==='empezar'){ MP.begin(m); }
     else if(t==='sale'){ MP.playerLeft(m.id); }
@@ -2744,15 +2745,18 @@ Object.assign(MP,{
   renderRoom(){
     $('mpHome').style.display=MP.inRoom?'none':''; $('mpRoom').style.display=MP.inRoom?'':'none'; if(!MP.inRoom)return;
     $('mpCodeBig').textContent=MP.code; const l=$('mpList'); l.textContent='';
-    MP.plist.forEach((j,i)=>{ const d=document.createElement('div'); d.className='mpp'; const b=document.createElement('b'); b.textContent='● '; b.style.color=MPCSS[i%4]; d.appendChild(b); d.appendChild(document.createTextNode(j.n+(j.id===MP.hostId?' · anfitrión':'')+(j.id===MP.myId?' · tú':''))); l.appendChild(d); });
+    MP.plist.forEach((j,i)=>{ const d=document.createElement('div'); d.className='mpp'; const b=document.createElement('b'); b.textContent='● '; b.style.color=MPCSS[i%4]; d.appendChild(b); d.appendChild(document.createTextNode(j.n+(j.id===MP.hostId?' · anfitrión':'')+(j.id===MP.myId?' · tú':'')+((MP.myId===MP.hostId&&j.id!==MP.hostId&&(MP.vers[j.id]||0)<NBR_VER)?' · ⚠ versión anterior':''))); l.appendChild(d); });
     const host=MP.myId===MP.hostId; $('mpStart').style.display=host?'':'none';
     for(const b of $('mpModo').children)b.classList.toggle('on',b.dataset.v===MP.modo); $('mpModo').style.pointerEvents=host?'':'none'; $('mpModo').style.opacity=host?'':'.75';
     const pv=MP.modo==='pvp'; let h;
     if(!host)h=(pv?'Modo: TODOS CONTRA TODOS. ':'Modo: EN EQUIPO. ')+'Esperando a que el anfitrión empiece la partida…';
     else if(MP.plist.length<2)h='Comparte el código o el enlace y espera a tus amigos (hasta 4 jugadores). También puedes empezar solo para probar.';
     else h=(pv?'Todos contra todos: 5 minutos, gana quien sume más puntos (monstruos y jugadores).':'Cuando estén todos, pulsa EMPEZAR.')+' Cada uno oye su propia música.';
-    { const lb=host?MP.labPref:MP.labG; $('mpLab').textContent='🧩 LABERINTO: '+(lb?'SÍ':'NO'); $('mpLab').classList.toggle('on',lb); $('mpLabBox').style.pointerEvents=host?'':'none'; $('mpLabBox').style.opacity=host?'':'.75';
-      if(lb)h+=pv?' Con laberinto: las 4 alas abiertas desde el principio y los pasillos cambian cada pocos segundos.':' Con laberinto: los créditos son de todos y cualquiera puede abrir las puertas.'; }
+    { const lb=host?MP.labPref:MP.labG; $('mpLab').textContent='🧩 LABERINTO: '+(lb===null?'?':(lb?'SÍ':'NO')); $('mpLab').classList.toggle('on',!!lb); $('mpLabBox').style.pointerEvents=host?'':'none'; $('mpLabBox').style.opacity=host?'':'.75';
+      if(lb)h+=pv?' Con laberinto: las 4 alas abiertas desde el principio y los pasillos cambian cada pocos segundos.':' Con laberinto: los créditos son de todos y cualquiera puede abrir las puertas.';
+      if(host){ if(lb&&MP.plist.some(j=>j.id!==MP.hostId&&(MP.vers[j.id]||0)<NBR_VER))h+=' ⚠ Alguien tiene una versión anterior del juego y NO verá el laberinto: que actualice la app.'; }
+      else if(performance.now()-MP.joinT>2500&&(MP.hostVer||0)<NBR_VER)h+=' ⚠ El anfitrión tiene una versión anterior del juego: no habrá laberinto hasta que actualice.';
+      h+='  [tu versión: '+NBR_LABEL+']'; }
     $('mpHint').textContent=h;
   },
   /* ---------- reloj común con el servidor (v23) ---------- */
@@ -2818,7 +2822,8 @@ Object.assign(MP,{
 
   /* ---------- mensajes de juego ---------- */
   onRelay(from,d){
-    if(d&&d.k==='lobby'&&!MP.on&&from===MP.hostId){ MP.labG=!!d.lab; MP.renderRoom(); return; }   /* sala de espera: el anfitrión dice si habrá laberinto */
+    if(d&&d.k==='lobby'&&!MP.on&&from===MP.hostId){ MP.labG=!!d.lab; MP.hostVer=+d.v||0; MP.renderRoom(); return; }   /* sala de espera: el anfitrión dice si habrá laberinto y su versión */
+    if(d&&d.k==='ver'&&!MP.on&&MP.myId===MP.hostId){ MP.vers[from]=+d.v||0; MP.renderRoom(); return; }   /* cada invitado dice su versión */
     if(!MP.on||!d)return;
     if(MP.host){
       const q=MP.oth.get(from); if(!q)return;
@@ -3135,7 +3140,7 @@ $('mpShare').addEventListener('click',()=>MP.share());
 $('mpCopy').addEventListener('click',()=>MP.copy());
 $('mpStart').addEventListener('click',()=>{if(MP.inRoom&&MP.myId===MP.hostId)MP.send({t:'empezar'});});
 $('mpLeave').addEventListener('click',()=>MP.leaveRoom());
-$('mpLab').addEventListener('click',()=>{ if(MP.inRoom&&MP.myId===MP.hostId){ MP.labPref=!MP.labPref; store.set('nbr.mplab',MP.labPref); MP.renderRoom(); MP.rl({k:'lobby',lab:MP.labPref?1:0},'*'); } });
+$('mpLab').addEventListener('click',()=>{ if(MP.inRoom&&MP.myId===MP.hostId){ MP.labPref=!MP.labPref; store.set('nbr.mplab',MP.labPref); MP.renderRoom(); MP.rl({k:'lobby',lab:MP.labPref?1:0,v:NBR_VER},'*'); } });
 for(const b of $('mpModo').children)b.addEventListener('click',()=>{ if(MP.inRoom&&MP.myId===MP.hostId)MP.send({t:'modo',m:b.dataset.v}); });
 $('mpClose').addEventListener('click',()=>MP.closeUi());
 W.getPl=()=>(MP.on&&MP.host)?MP.roster:[P]; W.emit=o=>MP.ev(o); W.onReq=i=>MP.rl({k:'dr',i});
@@ -3473,7 +3478,7 @@ function perfTick(ms){
   PERF.acc+=ms; PERF.n++; if(PERF.acc<1000)return;
   const fps=PERF.n*1000/PERF.acc, mode=PERF.mode, cap=mode==='low'?30:60; PERF.js=PERF.jsA/PERF.n; PERF.acc=0; PERF.n=0; PERF.jsA=0; PERF.fps=fps;
   if(S.running&&!S.paused&&!document.hidden){const q=Tel.r;q.fn++;q.fs+=fps;if(fps<q.fmin)q.fmin=fps;if(fps<30)q.flo++;q.fq+=ql;q.qh[Math.min(ql,4)]++;}
-  if(PERF.show){const i=renderer.info.render;$('fpsd').textContent=Math.round(fps)+' FPS · RES '+Math.round(QL[ql].rs*100)+'% · N'+ql+' · '+i.calls+' dib · '+Math.round(i.triangles/1000)+'k△ · JS '+PERF.js.toFixed(1)+' ms';}
+  if(PERF.show){const i=renderer.info.render;$('fpsd').textContent=NBR_LABEL+' · '+Math.round(fps)+' FPS · RES '+Math.round(QL[ql].rs*100)+'% · N'+ql+' · '+i.calls+' dib · '+Math.round(i.triangles/1000)+'k△ · JS '+PERF.js.toFixed(1)+' ms';}
   if(!S.running||S.paused||document.hidden){PERF.skip=2;PERF.bad=PERF.good=0;return;}
   if(PERF.skip>0){PERF.skip--;return;}
   /* v30: todos los modos se adaptan. AUTO: objetivo 60 (rango completo). AHORRO: objetivo 30, nunca mejor que el nivel 2 pero baja hasta el 5 si no llega.
