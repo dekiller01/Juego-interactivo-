@@ -426,6 +426,69 @@ Ahora el laberinto (puertas, créditos, alas, minizonas, pasillos que cambian y 
 - **Honesto:** no se ha probado con móviles reales ni con la red real de Render (se probó con 3 navegadores a la vez en una máquina, con el servidor de verdad). Los cambios del anfitrión llegan en hasta ~0,1 s más lo que tarde la red, así que un invitado con mala conexión puede ver cerrarse un muro un instante después que el anfitrión; si estaba justo dentro, el juego lo empuja fuera del muro. El anfitrión hace todo el trabajo (enemigos, caminos de todos, cambios): con 4 jugadores en un laberinto grande su teléfono es el que más sufre, así que si va justo conviene apagar el laberinto en la sala (🧩 NO) o usar el modo AHORRO. En todos contra todos los monstruos siguen apareciendo (como antes) pero ahora por todo el laberinto.
 - **Para actualizar:** sube solo `index.html` (`perfiles.js`, `salas.js` y `server.js` no cambian), espera a que Render termine de desplegar y vuelve a ejecutar «Construir APK». **Todos los jugadores** deben tener la versión nueva: un invitado con la versión anterior dentro de una sala con laberinto no vería los muros (vería a los monstruos andar «a través» de paredes que para él no existen).
 
+## Novedades v33: fps estables en niveles muy altos (multijugador y solo)
+
+Reporte: en el **nivel 714** en multijugador, el anfitrión bajaba de 60 a 12 fps y el invitado llegaba a 5.
+
+- **Causa:** los grupos de enemigos del director crecían con el nivel sin límite (`1 + azar(1 + nivel·0,3 + dificultad·2)` → hasta ~217 enemigos de golpe) y `spawnEnemy` no comprobaba el tope. En el nivel 714 llegaba a haber **~140 enemigos a la vez** (el tope de diseño es 28 en solitario y 40 en multijugador). Eso significa ~300–460 llamadas de dibujo, y además los paquetes que el anfitrión manda cada 0,1 s (todos los enemigos y proyectiles) llegaban a **7–9 KB**, cerca del límite de 16 KB de la sala (si se pasa, el servidor corta la conexión).
+- **Arreglo 1:** `spawnGroup` nunca supera el tope (`maxEnemies()`); si ya está lleno, no genera nada.
+- **Arreglo 2:** el director genera como mucho **12 enemigos por grupo**.
+- **Arreglo 3:** red de seguridad en `spawnEnemy`: no pasa de `tope + 14` (jefes y dragones quedan fuera de esta regla, así que los jefes de cada 4 niveles siguen apareciendo). `!caos` de TikTok y el botón HORDA pueden pasarse del tope hasta +8 para que sigan notándose.
+- **Arreglo 4:** el paquete de estado que el anfitrión manda a los invitados lleva como máximo 90 enemigos, 80 proyectiles, 30 zonas y 20 botiquines.
+- **En solitario** también mejora: a partir del nivel ~100 los grupos podían pasar de 28.
+
+**Medido (nivel 714, anfitrión + invitado reales, 40 s, GPU por software):**
+
+| | antes | después |
+|---|---|---|
+| enemigos a la vez | ~141 | 40–46 |
+| paquete máximo | 9 193 B | 3 257 B (3 171 B con las 4 alas abiertas y moviéndose) |
+| llamadas de dibujo | 300–460 | 20–170 (según dónde se mire) |
+
+- **Pruebas:** `nbr/t107.js` (`LEVEL=714 SECS=40 node t107.js`; `OPEN=1 WALK=1` abre las 4 alas y teletransporta a los jugadores; `THR=4` limita la CPU; `PVP=1`, `MAZE=0`): falla si hay más de 60 enemigos, un paquete de más de 8 KB o errores de JavaScript. Además pasan las pruebas de siempre (t97, t100 con y sin `PVP=1`, t104, t105, t106, t67, t84…).
+- **Honesto:** no se ha probado con móviles reales. El probador usa GPU por software, así que sus fps (10–17 en la prueba más dura) no se trasladan a un teléfono; lo fiable es que bajan los enemigos, los dibujos y el tamaño de los paquetes. En un teléfono muy flojo, en niveles así de altos, el modo AUTO sigue bajando la calidad si hace falta.
+- **Cambio de juego a tener en cuenta:** a niveles altos ya no se acumulan cientos de enemigos; la dificultad sigue subiendo por la vida (y la fuerza) de cada enemigo, no por la cantidad.
+- **Para actualizar:** sube solo `index.html` (`perfiles.js`, `salas.js` y `server.js` no cambian), espera a que Render termine de desplegar y vuelve a ejecutar «Construir APK». El **anfitrión** es quien genera los enemigos y los paquetes, así que es el que más necesita la v33 (si el anfitrión sigue en la v32.1, el problema sigue); conviene que todos la tengan. La versión se ve en la sala de espera y en la línea de FPS (**v33**); la v32.1 se sigue reconociendo como compatible con el laberinto.
+
+## Novedades v34: más enemigos a la vez, sin que se caigan los fps
+
+Pedido: no querer un tope fijo de enemigos y poder aguantar niveles muy altos (el 714 en multijugador).
+
+**1. Ajuste ⚙ «ENEMIGOS»: AUTO / NORMAL / ALTO / MÁXIMO** (por defecto AUTO; se guarda en el teléfono).
+- **NORMAL:** el tope de siempre (28 en solitario, 40 en multijugador, según el nivel).
+- **ALTO:** el doble (56 / 80).
+- **MÁXIMO:** hasta 120. Es el techo real por la red: el paquete de estado debe caber en 16 KB (límite de la sala del servidor); con 123 enemigos el paquete mide ~6,2 KB. Subirlo más exigiría cambiar `salas.js` en Render.
+- **AUTO:** empieza en el tope normal y lo sube **+2 por segundo** mientras (a) el tope se esté usando, (b) los fps del **peor** de los jugadores estén por encima del 93 % del objetivo (≥56 de 60) y (c) la calidad gráfica no haya tenido que bajar de nivel (N≤2). Si los fps caen por debajo del 66 % (≈40), **baja 6** de golpe y espera 6 s antes de volver a subir. Techo: 100. En modo AHORRO (objetivo 30 fps) nunca sube.
+- **En multijugador** cada invitado le manda sus fps al anfitrión cada segundo (mensaje nuevo `{k:'fps'}` por la sala); el anfitrión usa el peor y descarta datos de más de 5 s. **Manda el anfitrión**: su ajuste es el que cuenta.
+- La línea de FPS (⚙ → FPS) ahora termina con `ENE 43/48` (enemigos / tope actual).
+- El paquete de estado lleva un presupuesto de 8 000 bytes para los enemigos (si se pasara, recorta los últimos) para no acercarse nunca a los 16 KB.
+
+**2. Dibujo agrupado de los humanoides** (zombi, corredor, tanque, escupidor, toro, médico y sanador).
+- Antes cada uno gastaba ~8 llamadas de dibujo (6 piezas + cascarón + ojos). Ahora, por cada pieza de cada tipo hay **una** malla instanciada que dibuja a todos de golpe, con la matriz de la pieza ya animada. Las piezas originales siguen existiendo (la animación no cambió) pero no se dibujan.
+- Se recorta por pieza fuera de pantalla igual que antes (mismos triángulos), y los enemigos tras una pared o a tus espaldas ni se calculan.
+- El destello de daño y el aviso de ataque (el «emisivo» del cuerpo) viajan por instancia y se suman en el sombreador, igual que antes. Una prueba compara capturas del dibujo nuevo y el viejo: la única diferencia es el rotor del dron, que no se agrupa.
+- Funciona también con los fantasmas del invitado y con los enemigos que están muriendo.
+- **Interruptor de emergencia:** en el almacenamiento del navegador `nbr.inst = false` vuelve al dibujo de siempre.
+- **Todavía NO se agrupan:** drones, explosivos, divisores, crías, fantasmas, jefes, dragones y fénix (siguen como antes; son la mayoría de las llamadas que quedan).
+
+**Medido (GPU por software, no es un teléfono real):**
+
+| Prueba | v33 / sin agrupar | v34 |
+|---|---|---|
+| 120 humanoides cerca (solitario, `t109.js`): llamadas de dibujo | 412 | **95** (−77 %) |
+| 120 humanoides cerca: triángulos | 89 k | 90 k (igual) |
+| 120 enemigos mezclados repartidos hasta 40 m: llamadas | 243 | **139** (−43 %) |
+| Multijugador nivel 714, modo MÁXIMO, ~118 enemigos (anfitrión): llamadas | 63 | **37** |
+| mismo: JS por cuadro | 8,7 ms | 7,6 ms |
+| mismo: fps del probador | 18 | 23 |
+| Nivel 714, NORMAL (como v33): enemigos / paquete máx. | 43 / 2,7 KB | 45 / 2,8 KB |
+
+El motor por software dibuja a base de triángulos, por eso sus fps casi no reflejan el ahorro de llamadas; en un teléfono real el ahorro de llamadas (trabajo del procesador) pesa más. No lo he medido en un teléfono.
+
+**Pruebas nuevas:** `nbr/t108.js` (ajuste: 27 comprobaciones, incluidos los fps del invitado y el paquete con 120 enemigos), `nbr/t110.js` (dibujo agrupado: 15, incluida la comparación de imágenes y los fantasmas), `nbr/t109.js` (banco de dibujo: `N=120 RING=4,18 MIX=hum node t109.js`, con `NOINST=1` para comparar). `t107.js` admite `ECAPM=max` y `NOINST=1`. Pasan además todas las de siempre (t97, t100 con y sin `PVP=1`, t104, t105, t106, t67, t73, t74, t76, t79, t84, t52, t53, t54, t60).
+
+**Para actualizar:** sube solo `index.html` (el servidor no cambia), espera a que Render termine de desplegar y vuelve a ejecutar «Construir APK». La versión se ve como **v34**. El anfitrión es el que decide el tope y el que más gana; el laberinto sigue necesitando ≥ v32.1.
+
 ## Cómo seguir añadiendo cosas sin que se ponga pesado
 
 Reglas que se siguen en cada mejora: reutilizar geometrías y materiales (nunca crear uno nuevo por enemigo o disparo), reutilizar objetos en vez de
